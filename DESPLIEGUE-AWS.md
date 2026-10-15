@@ -40,6 +40,26 @@ para que la IP no cambie al reiniciar.
 
 > 1 GB (t2/t3.micro de la capa gratuita) también funciona: el instalador crea 2 GB de swap, pero la primera compilación tarda más.
 
+## Actualizar con git (forma normal)
+
+El servidor es un clon de este repositorio (`~/cleantok`, siguiendo `origin/main`). Cada `git push` a `main` dispara
+**GitHub Actions** (`.github/workflows/desplegar.yml`): corre las pruebas y, si pasan, entra por SSH y ejecuta
+`deploy/actualizar.sh <commit>`, que hace `git checkout` de ese commit y reinicia una réplica a la vez.
+
+```powershell
+git commit -am "Mejora X"; git push          # despliega solo
+git tag v1.1; git push --tags                # versión con nombre
+```
+
+- Volver atrás: Actions → *Pruebas y despliegue* → *Run workflow* con el commit/tag (opción "saltar pruebas").
+- Los pull requests solo corren las pruebas.
+- Historial en el servidor: `~/cleantok/despliegues.log`.
+- Secretos del repositorio (una vez): `SSH_HOST` = `44.215.16.137` y `SSH_PRIVATE_KEY` = llave `cleantok_github_actions`
+  (está en el kit de traspaso; su parte pública ya está autorizada en el servidor). Sin ellos, Actions corre las
+  pruebas y omite el despliegue con un aviso.
+
+`deploy/subir-a-aws.ps1` (subir por SCP desde la PC) queda solo para un servidor nuevo.
+
 ## 2. Subir e instalar (desde tu PC con Windows)
 
 En PowerShell, dentro de la carpeta `CLEANTOK`:
