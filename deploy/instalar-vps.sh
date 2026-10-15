@@ -93,6 +93,8 @@ $COMPOSE up -d db
 $COMPOSE up -d --no-deps api1;  esperar_sano api1; echo " api1 lista"
 $COMPOSE up -d --no-deps api2;  esperar_sano api2; echo " api2 lista"
 $COMPOSE up -d caddy
+# Aplica cambios del Caddyfile sin reiniciar Caddy (no corta conexiones).
+$COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 || true
 sudo docker image prune -f >/dev/null
 
 echo
