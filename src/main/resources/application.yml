@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: cleantok-api
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:cleantok}
+    username: ${DB_USER:cleantok}
+    password: ${DB_PASSWORD:cleantok}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      # El límite de negocio (15 MB PDF, 5 MB foto) se valida en el servicio con su código de error.
+      max-file-size: 20MB
+      max-request-size: 21MB
+  web:
+    locale: es
+    locale-resolver: fixed
+  jackson:
+    time-zone: America/Guayaquil
+
+server:
+  port: ${PORT:8080}
+  error:
+    include-stacktrace: never
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+cleantok:
+  url-publica: ${CLEANTOK_URL_PUBLICA:http://localhost:8080}
+  jwt:
+    secret: ${JWT_SECRET:cambia-este-secreto-de-desarrollo-de-32-bytes-o-mas!!}
+    acceso-minutos: 15
+    refresh-dias: 7
+  cors:
+    origenes: ${CLEANTOK_CORS_ORIGENES:http://localhost:5173,http://localhost:3000}
+  ia:
+    habilitada: ${CLEANTOK_IA_HABILITADA:false}
+    modelo: ${CLEANTOK_IA_MODELO:claude-opus-5-5}
+    api-key: ${ANTHROPIC_API_KEY:}
+    timeout-segundos: ${CLEANTOK_IA_TIMEOUT_SEG:60}
+  super-admin:
+    email: ${CLEANTOK_SUPERADMIN_EMAIL:}
+    password: ${CLEANTOK_SUPERADMIN_PASSWORD:}
+  android:
+    paquete: ${CLEANTOK_ANDROID_PAQUETE:}
+    sha256: ${CLEANTOK_ANDROID_SHA256:}
+  nivel:
+    umbral-sugerencia: ${CLEANTOK_UMBRAL_SUGERENCIA_NIVEL:0.25}
+  dias-cobertura-min: ${CLEANTOK_DIAS_COBERTURA_MIN:7}
+  almacenamiento:
+    tipo: ${ALMACENAMIENTO_TIPO:local}
+    ruta: ${ALMACENAMIENTO_RUTA:./almacenamiento}
+    supabase:
+      url: ${SUPABASE_URL:}
+      service-key: ${SUPABASE_SERVICE_KEY:}
+      bucket: ${SUPABASE_BUCKET:}
+  abastecimiento:
+    dias-entrega: ${CLEANTOK_DIAS_ENTREGA:3}
+    dias-ciclo: ${CLEANTOK_DIAS_CICLO:14}
+    dias-seguridad: ${CLEANTOK_DIAS_SEGURIDAD:3}
+    factor-ruta: ${CLEANTOK_FACTOR_RUTA:1.3}
+    velocidad-km-h: ${CLEANTOK_VELOCIDAD_KMH:25}
+    minutos-por-parada: ${CLEANTOK_MINUTOS_PARADA:10}
+    co2-kg-por-km: ${CLEANTOK_CO2_KG_KM:0.25}
+    # Enrutador OSRM (OpenStreetMap). El público es para demos; vacío = solo línea recta.
+    osrm-url: ${CLEANTOK_OSRM_URL:https://router.project-osrm.org}
+  alertas:
+    job-habilitado: ${CLEANTOK_ALERTAS_JOB:true}
+    cron: ${CLEANTOK_ALERTAS_CRON:0 0 * * * *}
+
+logging:
+  level:
+    root: INFO

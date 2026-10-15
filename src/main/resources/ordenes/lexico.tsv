@@ -1,0 +1,113 @@
+# Léxico de sustantivos de producto (configurable).
+# Formato: termino|CATEGORIA|UNIDAD
+# - El término se compara normalizado (minúsculas, sin tildes) y acepta plural (+s / +es).
+# - Puede tener varias palabras ("toalla de manos"): las frases más largas ganan.
+# - Un fragmento SIN ningún término de este léxico se considera huérfano y se une al ítem anterior.
+# - La categoría y unidad son solo sugerencias: el admin las corrige en la revisión.
+
+# Químicos
+desodorante|QUIMICO|L
+aromatizante|QUIMICO|L
+ambientador|QUIMICO|L
+desinfectante|QUIMICO|L
+detergente|QUIMICO|KG
+detergente liquido|QUIMICO|L
+cloro|QUIMICO|L
+hipoclorito|QUIMICO|L
+alcohol|QUIMICO|L
+desengrasante|QUIMICO|L
+limpiavidrios|QUIMICO|L
+limpiavidrio|QUIMICO|L
+antisarro|QUIMICO|L
+insecticida|QUIMICO|UNIDAD
+jabon|QUIMICO|L
+lavavajilla|QUIMICO|UNIDAD
+lavaplatos|QUIMICO|UNIDAD
+cera|QUIMICO|L
+abrillantador|QUIMICO|L
+bactericida|QUIMICO|L
+fungicida|QUIMICO|L
+amonio|QUIMICO|L
+agua destilada|QUIMICO|L
+aceite|QUIMICO|L
+crema|QUIMICO|UNIDAD
+limpiador|QUIMICO|L
+destapa|QUIMICO|L
+destapacanerias|QUIMICO|L
+quitamanchas|QUIMICO|L
+lustramuebles|QUIMICO|L
+gel|QUIMICO|L
+suavizante|QUIMICO|L
+pastilla desodorante|QUIMICO|UNIDAD
+abono|OTRO|KG
+
+# Papel e higiene
+papel|PAPEL_Y_HIGIENE|ROLLO
+servilleta|PAPEL_Y_HIGIENE|PAQUETE
+toalla de manos|PAPEL_Y_HIGIENE|ROLLO
+toalla de papel|PAPEL_Y_HIGIENE|ROLLO
+panuelo|PAPEL_Y_HIGIENE|PAQUETE
+
+# Bolsas
+funda|BOLSAS|PAQUETE
+bolsa|BOLSAS|PAQUETE
+
+# Utensilios
+balde|UTENSILIO|UNIDAD
+bomba|UTENSILIO|UNIDAD
+cepillo|UTENSILIO|UNIDAD
+escoba|UTENSILIO|UNIDAD
+escobilla|UTENSILIO|UNIDAD
+espatula|UTENSILIO|UNIDAD
+esponja|UTENSILIO|UNIDAD
+lana|UTENSILIO|UNIDAD
+lija|UTENSILIO|UNIDAD
+limpion|UTENSILIO|UNIDAD
+recogedor|UTENSILIO|UNIDAD
+trapeador|UTENSILIO|UNIDAD
+toalla|UTENSILIO|UNIDAD
+atomizador|UTENSILIO|UNIDAD
+mano de oso|UTENSILIO|UNIDAD
+estropajo|UTENSILIO|UNIDAD
+pano|UTENSILIO|UNIDAD
+franela|UTENSILIO|UNIDAD
+mopa|UTENSILIO|UNIDAD
+mop|UTENSILIO|UNIDAD
+tela|UTENSILIO|UNIDAD
+squash|UTENSILIO|UNIDAD
+escurridor|UTENSILIO|UNIDAD
+pala|UTENSILIO|UNIDAD
+plumero|UTENSILIO|UNIDAD
+dispensador|UTENSILIO|UNIDAD
+letrero|UTENSILIO|UNIDAD
+senalizacion|UTENSILIO|UNIDAD
+contenedor|UTENSILIO|UNIDAD
+coche|UTENSILIO|UNIDAD
+escalera|UTENSILIO|UNIDAD
+rastrillo|UTENSILIO|UNIDAD
+azadon|UTENSILIO|UNIDAD
+tijera|UTENSILIO|UNIDAD
+costal|UTENSILIO|UNIDAD
+carretilla|UTENSILIO|UNIDAD
+baston|UTENSILIO|UNIDAD
+limpiavidrios con mango|UTENSILIO|UNIDAD
+sistema limpiavidrios|UTENSILIO|UNIDAD
+
+# Equipo de protección personal
+guante|EPP|PAR
+mascarilla|EPP|UNIDAD
+gafas|EPP|UNIDAD
+gorro|EPP|UNIDAD
+bata|EPP|UNIDAD
+mandil|EPP|UNIDAD
+botas|EPP|PAR
+
+# Maquinaria
+abrillantadora|MAQUINARIA|UNIDAD
+aspiradora|MAQUINARIA|UNIDAD
+hidrolavadora|MAQUINARIA|UNIDAD
+hdirolavadora|MAQUINARIA|UNIDAD
+fumigadora|MAQUINARIA|UNIDAD
+podadora|MAQUINARIA|UNIDAD
+pulidora|MAQUINARIA|UNIDAD
+lavadora|MAQUINARIA|UNIDAD

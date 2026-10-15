@@ -1,0 +1,193 @@
+### Colección de ejemplos para CleanTok API
+### Funciona con IntelliJ HTTP Client y con la extensión "REST Client" de VS Code.
+### Requiere la API levantada con el perfil demo (docker compose up).
+
+@base = http://localhost:8080/api/v1
+@clave = Demo2026!
+
+### 1. Login del admin (copia accessToken en @admin)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email": "admin@brillototal.ec", "password": "{{clave}}"}
+
+> {% client.global.set("admin", response.body.accessToken); client.global.set("refresh", response.body.refreshToken); %}
+
+### 2. Login de una encargada
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email": "maria@brillototal.ec", "password": "{{clave}}"}
+
+> {% client.global.set("enc", response.body.accessToken); %}
+
+### 3. ¿Quién soy? (rol, empresa y establecimientos)
+GET {{base}}/auth/me
+Authorization: Bearer {{enc}}
+
+### 4. Renovar la sesión (rota el refresh token)
+POST {{base}}/auth/refresh
+Content-Type: application/json
+
+{"refreshToken": "{{refresh}}"}
+
+### 5. Mis establecimientos (guarda el primero)
+GET {{base}}/establecimientos/mios
+Authorization: Bearer {{enc}}
+
+> {% client.global.set("est", response.body[0].id); client.global.set("bodega", response.body[0].bodegaId); %}
+
+### 6. Ubicaciones (el admin ve también la URL del QR)
+GET {{base}}/establecimientos/{{est}}/ubicaciones
+Authorization: Bearer {{admin}}
+
+> {% client.global.set("piso", response.body[1].id); client.global.set("tokenPiso", response.body[1].urlQr.split("/q/")[1]); %}
+
+### 7. Escanear el QR de un piso: productos con stock aquí y en bodega, y alertas abiertas
+GET {{base}}/qr/{{tokenPiso}}
+Authorization: Bearer {{enc}}
+
+> {% client.global.set("producto", response.body.productos[0].id); %}
+
+### 8. Ingreso en la bodega (llegó del proveedor): 2 galones = 7,57 L
+POST {{base}}/movimientos
+Authorization: Bearer {{enc}}
+Content-Type: application/json
+
+{"clientUuid": "{{$uuid}}", "tipo": "INGRESO", "productoId": "{{producto}}", "ubicacionId": "{{bodega}}",
+ "cantidad": 2, "unidad": "GALON", "ocurridoEn": "{{$isoTimestamp}}"}
+
+### 9. "Agregar" en el piso = traslado desde bodega
+POST {{base}}/movimientos
+Authorization: Bearer {{enc}}
+Content-Type: application/json
+
+{"clientUuid": "{{$uuid}}", "tipo": "TRASLADO", "productoId": "{{producto}}", "ubicacionId": "{{piso}}",
+ "cantidad": 3.5, "unidad": "L", "ocurridoEn": "{{$isoTimestamp}}"}
+
+### 10. "Retirar" en el piso = consumo (puede sugerir reportar nivel)
+POST {{base}}/movimientos
+Authorization: Bearer {{enc}}
+Content-Type: application/json
+
+{"clientUuid": "{{$uuid}}", "tipo": "CONSUMO", "productoId": "{{producto}}", "ubicacionId": "{{piso}}",
+ "cantidad": 500, "unidad": "ML", "ocurridoEn": "{{$isoTimestamp}}", "nota": "Limpieza de baños"}
+
+### 11. Consumo mayor que lo disponible → 422 STOCK_INSUFICIENTE con "disponible"
+POST {{base}}/movimientos
+Authorization: Bearer {{enc}}
+Content-Type: application/json
+
+{"clientUuid": "{{$uuid}}", "tipo": "CONSUMO", "productoId": "{{producto}}", "ubicacionId": "{{piso}}",
+ "cantidad": 9999, "ocurridoEn": "{{$isoTimestamp}}"}
+
+### 12. Reporte de nivel (0/25/50/75/100) → abre NIVEL_CRITICO si es ≤ 25
+POST {{base}}/reportes-nivel
+Authorization: Bearer {{enc}}
+Content-Type: application/json
+
+{"clientUuid": "{{$uuid}}", "productoId": "{{producto}}", "ubicacionId": "{{piso}}", "nivelPct": 25,
+ "ocurridoEn": "{{$isoTimestamp}}"}
+
+### 13. Sincronización offline (hasta 100 ítems, en orden de ocurridoEn)
+POST {{base}}/sincronizacion/lote
+Authorization: Bearer {{enc}}
+Content-Type: application/json
+
+{"items": [
+  {"tipo": "MOVIMIENTO", "movimiento": {"clientUuid": "{{$uuid}}", "tipo": "CONSUMO", "productoId": "{{producto}}",
+    "ubicacionId": "{{piso}}", "cantidad": 0.25, "ocurridoEn": "2026-10-12T09:15:00-05:00"}},
+  {"tipo": "REPORTE_NIVEL", "reporteNivel": {"clientUuid": "{{$uuid}}", "productoId": "{{producto}}",
+    "ubicacionId": "{{piso}}", "nivelPct": 50, "ocurridoEn": "2026-10-12T09:16:00-05:00"}}
+]}
+
+### 14. Subir una foto (JPEG/PNG/WEBP ≤ 5 MB) y usar su id en fotoId
+POST {{base}}/fotos
+Authorization: Bearer {{enc}}
+Content-Type: multipart/form-data; boundary=limite
+
+--limite
+Content-Disposition: form-data; name="archivo"; filename="nivel.png"
+Content-Type: image/png
+
+< ./ejemplo-nivel.png
+--limite--
+
+### 15. Inventario: bodega, pisos, consumo 7/30 días, cobertura y estado
+GET {{base}}/establecimientos/{{est}}/inventario
+Authorization: Bearer {{enc}}
+
+### 16. Alertas abiertas
+GET {{base}}/establecimientos/{{est}}/alertas?estado=ABIERTA
+Authorization: Bearer {{admin}}
+
+> {% client.global.set("alerta", response.body.content[0].id); %}
+
+### 17. Marcar alerta como atendida
+PATCH {{base}}/alertas/{{alerta}}/atender
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{"nota": "Pedido enviado al proveedor"}
+
+### 18. Kardex del producto en el piso (entrada, salida y saldo)
+GET {{base}}/productos/{{producto}}/kardex?ubicacionId={{piso}}&size=20
+Authorization: Bearer {{enc}}
+
+### 19. Ajuste (solo admin, motivo obligatorio)
+POST {{base}}/movimientos
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{"clientUuid": "{{$uuid}}", "tipo": "AJUSTE", "sentido": "SALIDA", "productoId": "{{producto}}",
+ "ubicacionId": "{{bodega}}", "cantidad": 0.5, "motivo": "Derrame en bodega", "ocurridoEn": "{{$isoTimestamp}}"}
+
+### ---------- Órdenes de compra en PDF (admin) ----------
+
+### 20. Crear un establecimiento nuevo (la bodega se crea sola)
+POST {{base}}/establecimientos
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{"nombre": "Edificio Demo PDF", "tipo": "OFICINA", "entidadContratante": "Entidad Demo", "areaM2": 1250}
+
+> {% client.global.set("estPdf", response.body.id); %}
+
+### 21. Subir la orden de ejemplo (responde 202; se procesa en segundo plano)
+POST {{base}}/establecimientos/{{estPdf}}/ordenes
+Authorization: Bearer {{admin}}
+Content-Type: multipart/form-data; boundary=limite
+
+--limite
+Content-Disposition: form-data; name="archivo"; filename="orden-demo-sercop.pdf"
+Content-Type: application/pdf
+
+< ../demo/orden-demo-sercop.pdf
+--limite--
+
+> {% client.global.set("orden", response.body.id); %}
+
+### 22. Estado de la orden (repetir hasta PENDIENTE_REVISION)
+GET {{base}}/ordenes/{{orden}}
+Authorization: Bearer {{admin}}
+
+### 23. Materiales propuestos agrupados por sección
+GET {{base}}/ordenes/{{orden}}/materiales
+Authorization: Bearer {{admin}}
+
+> {% client.global.set("material", response.body[0].items[0].id); %}
+
+### 24. Editar un material
+PATCH {{base}}/materiales/{{material}}
+Authorization: Bearer {{admin}}
+Content-Type: application/json
+
+{"nombre": "Balde plástico de 12 L", "unidad": "UNIDAD"}
+
+### 25. Confirmar: crea los productos con stock 0 (idempotente)
+POST {{base}}/ordenes/{{orden}}/confirmar
+Authorization: Bearer {{admin}}
+
+### 26. Hoja PDF con los QR para imprimir (4 por página)
+GET {{base}}/establecimientos/{{est}}/qr-hoja.pdf
+Authorization: Bearer {{admin}}

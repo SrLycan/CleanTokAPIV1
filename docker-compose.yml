@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-cleantok}
+      POSTGRES_USER: ${DB_USER:-cleantok}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-cleantok}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cleantok} -d ${DB_NAME:-cleantok}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-cleantok}
+      DB_USER: ${DB_USER:-cleantok}
+      DB_PASSWORD: ${DB_PASSWORD:-cleantok}
+      JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-de-desarrollo-de-32-bytes-o-mas!!}
+      CLEANTOK_URL_PUBLICA: ${CLEANTOK_URL_PUBLICA:-http://localhost:8080}
+      CLEANTOK_CORS_ORIGENES: ${CLEANTOK_CORS_ORIGENES:-http://localhost:5173,http://localhost:3000}
+      CLEANTOK_IA_HABILITADA: ${CLEANTOK_IA_HABILITADA:-false}
+      CLEANTOK_IA_MODELO: ${CLEANTOK_IA_MODELO:-claude-opus-5-5}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLEANTOK_DIAS_COBERTURA_MIN: ${CLEANTOK_DIAS_COBERTURA_MIN:-7}
+      CLEANTOK_UMBRAL_SUGERENCIA_NIVEL: ${CLEANTOK_UMBRAL_SUGERENCIA_NIVEL:-0.25}
+      CLEANTOK_SUPERADMIN_EMAIL: ${CLEANTOK_SUPERADMIN_EMAIL:-superadmin@cleantok.ec}
+      CLEANTOK_SUPERADMIN_PASSWORD: ${CLEANTOK_SUPERADMIN_PASSWORD:-SuperAdmin2026!}
+      CLEANTOK_ANDROID_PAQUETE: ${CLEANTOK_ANDROID_PAQUETE:-}
+      CLEANTOK_ANDROID_SHA256: ${CLEANTOK_ANDROID_SHA256:-}
+      CLEANTOK_IA_TIMEOUT_SEG: ${CLEANTOK_IA_TIMEOUT_SEG:-60}
+      CLEANTOK_ALERTAS_JOB: ${CLEANTOK_ALERTAS_JOB:-true}
+      ALMACENAMIENTO_TIPO: ${ALMACENAMIENTO_TIPO:-local}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
+    volumes:
+      - archivos:/data/almacenamiento
+
+volumes:
+  pgdata:
+  archivos:

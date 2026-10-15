@@ -1,0 +1,26 @@
+# Lista negra: áreas y superficies a limpiar, que no son materiales (configurable).
+# Un ítem cuya primera palabra (normalizada, sin plural) esté aquí se descarta.
+# Un paréntesis que contenga una de estas palabras se quita del nombre: "Cloro líquido (baños)" → "Cloro líquido".
+piso
+bano
+pared
+techo
+puerta
+ventana
+persiana
+meson
+escritorio
+mobiliario
+manilla
+suelo
+vidrio
+marco
+pasillo
+oficina
+grada
+pasamano
+cortina
+inodoro
+lavamanos
+urinario
+espejo

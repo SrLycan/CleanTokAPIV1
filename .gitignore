@@ -1,0 +1,14 @@
+.gradle/
+build/
+.idea/
+*.iml
+.env
+/almacenamiento/
+# Las órdenes reales contienen datos personales: no se versionan.
+src/test/resources/ordenes/*.pdf
+qr-hoja-prueba.pdf
+.kotlin/
+/respaldos/
+despliegues.log
+respaldos.log
+*.pem

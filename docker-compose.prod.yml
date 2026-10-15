@@ -1,0 +1,126 @@
+# Producción en un VPS (AWS Lightsail / EC2):
+#
+#   Internet ──443/80──▶ Caddy (reverse proxy + HTTPS Let's Encrypt + balanceador)
+#                          ├──▶ api1 :8080  (carga la semilla demo y corre el job de alertas)
+#                          └──▶ api2 :8080  (réplica: solo atiende peticiones)
+#                                   └──▶ PostgreSQL 16 (red interna)
+#
+# Lo levanta deploy/instalar-vps.sh. Solo Caddy publica puertos; la base y las API quedan en la red interna de Docker.
+# Las dos API son iguales (sin estado: JWT, refresh tokens y archivos en la base o el volumen compartido), así que
+# Caddy reparte las peticiones, saca de la rotación a la que falle su /actuator/health y reintenta en la otra.
+# Eso también permite actualizar sin cortar el servicio (instalar-vps.sh reinicia una réplica a la vez).
+
+x-logs: &logs
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+x-api: &api
+  <<: *logs
+  build: .
+  image: cleantok-api:latest
+  restart: unless-stopped
+  expose:
+    - "8080"
+  # 2 GB de RAM en total: cada réplica se limita para que entren las dos, Postgres y Caddy.
+  mem_limit: 700m
+  volumes:
+    - archivos:/data/almacenamiento
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+    interval: 15s
+    timeout: 5s
+    start_period: 90s
+    retries: 5
+  environment: &api-env
+    DB_HOST: db
+    DB_PORT: 5432
+    DB_NAME: ${DB_NAME:-cleantok}
+    DB_USER: ${DB_USER:-cleantok}
+    DB_PASSWORD: ${DB_PASSWORD}
+    JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+    CLEANTOK_URL_PUBLICA: ${CLEANTOK_URL_PUBLICA:?Falta CLEANTOK_URL_PUBLICA en .env}
+    CLEANTOK_CORS_ORIGENES: ${CLEANTOK_CORS_ORIGENES:-}
+    CLEANTOK_IA_HABILITADA: ${CLEANTOK_IA_HABILITADA:-false}
+    CLEANTOK_IA_MODELO: ${CLEANTOK_IA_MODELO:-claude-opus-5-5}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    CLEANTOK_IA_TIMEOUT_SEG: ${CLEANTOK_IA_TIMEOUT_SEG:-60}
+    CLEANTOK_DIAS_COBERTURA_MIN: ${CLEANTOK_DIAS_COBERTURA_MIN:-7}
+    CLEANTOK_UMBRAL_SUGERENCIA_NIVEL: ${CLEANTOK_UMBRAL_SUGERENCIA_NIVEL:-0.25}
+    CLEANTOK_SUPERADMIN_EMAIL: ${CLEANTOK_SUPERADMIN_EMAIL:-superadmin@cleantok.ec}
+    CLEANTOK_SUPERADMIN_PASSWORD: ${CLEANTOK_SUPERADMIN_PASSWORD:?Falta CLEANTOK_SUPERADMIN_PASSWORD en .env}
+    CLEANTOK_ANDROID_PAQUETE: ${CLEANTOK_ANDROID_PAQUETE:-}
+    CLEANTOK_ANDROID_SHA256: ${CLEANTOK_ANDROID_SHA256:-}
+    ALMACENAMIENTO_TIPO: ${ALMACENAMIENTO_TIPO:-local}
+    SUPABASE_URL: ${SUPABASE_URL:-}
+    SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+    SUPABASE_BUCKET: ${SUPABASE_BUCKET:-}
+    # Detrás de Caddy: respeta X-Forwarded-Proto/Host/For (enlaces https y la IP real del cliente).
+    SERVER_FORWARD_HEADERS_STRATEGY: framework
+    # Cierre ordenado: termina las peticiones en curso antes de apagarse (actualizaciones sin errores).
+    SERVER_SHUTDOWN: graceful
+    JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -Djava.awt.headless=true -Duser.timezone=UTC
+
+services:
+  db:
+    <<: *logs
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-cleantok}
+      POSTGRES_USER: ${DB_USER:-cleantok}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cleantok} -d ${DB_NAME:-cleantok}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Réplica principal: migra la base (Flyway), carga la semilla demo y corre el job de alertas.
+  api1:
+    <<: *api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
+      CLEANTOK_ALERTAS_JOB: ${CLEANTOK_ALERTAS_JOB:-true}
+
+  # Segunda réplica: arranca cuando la principal ya migró la base; sin semilla ni job (no se duplican).
+  api2:
+    <<: *api
+    depends_on:
+      api1:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      SPRING_PROFILES_ACTIVE: default
+      CLEANTOK_ALERTAS_JOB: "false"
+
+  caddy:
+    <<: *logs
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - api1
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMINIO: ${DOMINIO:?Falta DOMINIO en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  archivos:
+  caddy_data:
+  caddy_config:

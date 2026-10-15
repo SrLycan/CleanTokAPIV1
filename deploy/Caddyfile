@@ -1,0 +1,47 @@
+# Reverse proxy + balanceador de CleanTok. DOMINIO viene del .env:
+#   - un dominio o <ip-con-guiones>.sslip.io → HTTPS automático con Let's Encrypt (puertos 80 y 443 abiertos)
+#   - ":80"                                → solo HTTP por la IP (sin certificado)
+{
+	# Confía en X-Forwarded-For solo si viene de una red privada (por ejemplo, un balanceador de AWS delante).
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# PDF de órdenes (15 MB) y fotos: deja pasar un poco más que el límite del backend.
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy api1:8080 api2:8080 {
+		# Balanceo: a la réplica con menos peticiones en curso.
+		lb_policy least_conn
+		# Si una réplica falla o se está reiniciando, reintenta en la otra durante 10 s.
+		lb_try_duration 10s
+		lb_try_interval 250ms
+		# Chequeo activo: saca de la rotación a la réplica que no responda UP.
+		health_uri /actuator/health
+		health_interval 10s
+		health_timeout 3s
+		health_status 2xx
+		# Chequeo pasivo: 3 fallos en 30 s la sacan por 30 s.
+		fail_duration 30s
+		max_fails 3
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

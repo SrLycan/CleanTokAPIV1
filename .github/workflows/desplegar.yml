@@ -1,0 +1,99 @@
+# CI/CD del backend: en cada push a main corre las pruebas y, si pasan, despliega en el servidor de AWS.
+# También se puede lanzar a mano (Actions → "Pruebas y despliegue" → Run workflow) con un commit o tag para volver atrás.
+#
+# Secretos del repositorio (Settings → Secrets and variables → Actions):
+#   SSH_HOST         IP del servidor (44.215.16.137)
+#   SSH_PRIVATE_KEY  llave privada de despliegue (archivo cleantok_github_actions del kit de traspaso)
+name: Pruebas y despliegue
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit o tag a desplegar (vacío = último de main)"
+        required: false
+        default: ""
+      saltar_pruebas:
+        description: "Desplegar sin correr las pruebas (solo para volver atrás rápido)"
+        type: boolean
+        default: false
+
+# Nunca dos despliegues a la vez; uno nuevo espera al anterior.
+concurrency:
+  group: despliegue-produccion
+  cancel-in-progress: false
+
+jobs:
+  pruebas:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.saltar_pruebas }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      # Las pruebas de integración levantan PostgreSQL con Testcontainers (Docker ya viene en el runner).
+      - run: ./gradlew test --no-daemon
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-pruebas
+          path: build/reports/tests/test
+
+  desplegar:
+    needs: pruebas
+    # Solo main (push) o lanzamiento manual; los pull requests solo corren pruebas.
+    if: ${{ always() && (needs.pruebas.result == 'success' || needs.pruebas.result == 'skipped') && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: produccion
+      url: https://44-215-16-137.sslip.io
+    steps:
+      - name: Revisar secretos
+        id: secretos
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          if [ -z "$SSH_HOST" ]; then
+            echo "::warning::Faltan los secretos SSH_HOST y SSH_PRIVATE_KEY: no se despliega (ver DESPLIEGUE-AWS.md)."
+            echo "listos=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "listos=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Llave SSH
+        if: steps.secretos.outputs.listos == 'true'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts
+      - name: Desplegar en el servidor
+        if: steps.secretos.outputs.listos == 'true'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          REF: ${{ inputs.ref || github.sha }}
+        run: ssh -o ServerAliveInterval=30 "ubuntu@$SSH_HOST" "bash ~/cleantok/deploy/actualizar.sh '$REF'"
+      - name: Comprobar que responde
+        if: steps.secretos.outputs.listos == 'true'
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS https://44-215-16-137.sslip.io/actuator/health | grep -q UP; then echo "API arriba"; exit 0; fi
+            sleep 5
+          done
+          echo "La API no responde después del despliegue"; exit 1
