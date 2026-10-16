@@ -45,9 +45,16 @@ import ec.cleantok.comun.error.NoEncontradoException
 import ec.cleantok.comun.error.ValidacionException
 import ec.cleantok.comun.seguridad.ContextoSeguridad
 import ec.cleantok.establecimiento.dominio.EstablecimientoRepository
+import ec.cleantok.abastecimiento.dominio.Modalidad
 import ec.cleantok.identidad.dominio.EmpresaRepository
 import ec.cleantok.identidad.dominio.ProveedorRepository
+import ec.cleantok.identidad.dominio.Rol
+import ec.cleantok.identidad.dominio.UsuarioRepository
 import ec.cleantok.inventario.api.RefDto
+import ec.cleantok.notificacion.NotificacionService
+import ec.cleantok.notificacion.TipoNotificacion
+import org.springframework.data.domain.Pageable
+import java.time.temporal.ChronoUnit
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -84,6 +91,9 @@ class SolicitudService(
     private val establecimientos: EstablecimientoRepository,
     private val codigos: Codigos,
     private val ordenService: OrdenCompraService,
+    private val usuarios: UsuarioRepository,
+    private val notificaciones: NotificacionService,
+    private val fichas: FichaEmpresa,
     private val props: CleanTokProperties,
     private val clock: Clock,
 ) {
@@ -331,7 +341,10 @@ class SolicitudService(
     @Transactional(readOnly = true)
     fun obtenerComoProveedor(id: UUID): SolicitudProveedorDto = paraProveedor(invitada(id))
 
-    /** Crea o reemplaza mi oferta mientras la solicitud está en cotización. */
+    /**
+     * Crea o reemplaza mi oferta mientras la solicitud está en cotización y avisa a los administradores de la empresa.
+     * El plazo no lo elige el proveedor: son los días hasta la fecha requerida que fijó la empresa.
+     */
     @Transactional
     fun ofertar(id: UUID, req: OfertaRequest): SolicitudProveedorDto {
         val usuario = ContextoSeguridad.usuario()
@@ -339,24 +352,50 @@ class SolicitudService(
         val s = invitada(id)
         if (s.estado != EstadoSolicitud.EN_COTIZACION) throw ConflictoException("La solicitud ya no recibe ofertas")
         val proveedor = proveedores.findById(proveedorId).orElseThrow { NoEncontradoException("Proveedor") }
-        if (req.modalidad !in proveedor.modalidades()) throw ValidacionException("Tu empresa no tiene configurada esa modalidad de entrega")
+        val previa = ofertas.findBySolicitudIdAndProveedorId(s.id, proveedorId)
+        val propias = proveedor.modalidades()
+        val modalidad = req.modalidad ?: previa?.modalidad?.takeIf { it in propias }
+            ?: Modalidad.ENVIO_DIRECTO.takeIf { it in propias } ?: propias.first()
+        if (modalidad !in propias) throw ValidacionException("Tu empresa no tiene configurada esa modalidad de entrega")
+        val plazo = plazoHasta(s)
         val validos = items.findAllBySolicitudIdOrderByNombre(s.id).map { it.id }.toSet()
         val ofertados = req.items!!
         if (ofertados.any { it.itemId !in validos }) throw NoEncontradoException("Producto de la solicitud")
         if (ofertados.map { it.itemId }.toSet().size != ofertados.size) throw ValidacionException("Hay productos repetidos")
 
         val ahora = clock.instant()
-        val oferta = ofertas.findBySolicitudIdAndProveedorId(s.id, proveedorId)?.also {
-            it.modalidad = req.modalidad!!
-            it.plazoDias = req.plazoDias!!
+        val oferta = previa?.also {
+            it.modalidad = modalidad
+            it.plazoDias = plazo
             it.nota = req.nota?.trim()?.ifBlank { null }
             it.usuarioId = usuario.id
             it.enviadaEn = ahora
             ofertaItems.deleteAllByOfertaId(it.id)
             ofertaItems.flush()
-        } ?: ofertas.save(Oferta(s.id, proveedorId, req.modalidad!!, req.plazoDias!!, req.nota?.trim()?.ifBlank { null }, usuario.id, ahora))
-        ofertados.forEach { ofertaItems.save(OfertaItem(oferta.id, it.itemId!!, it.cantidadDisponible!!, it.precioUnitario!!)) }
+        } ?: ofertas.save(Oferta(s.id, proveedorId, modalidad, plazo, req.nota?.trim()?.ifBlank { null }, usuario.id, ahora))
+        val guardados = ofertados.map { ofertaItems.save(OfertaItem(oferta.id, it.itemId!!, it.cantidadDisponible!!, it.precioUnitario!!)) }
+        avisarOferta(s, oferta, guardados, proveedor.nombre, nueva = previa == null)
         return paraProveedor(s)
+    }
+
+    /** Días hasta la fecha requerida (0 si ya es hoy), dentro del rango que admite una oferta. */
+    private fun plazoHasta(s: Solicitud): Int =
+        ChronoUnit.DAYS.between(LocalDate.now(clock.withZone(Zona.ECUADOR)), s.fechaRequerida).coerceIn(0, 60).toInt()
+
+    /** Notificación a cada administrador activo de la empresa: "te cotizaron". */
+    private fun avisarOferta(s: Solicitud, oferta: Oferta, its: List<OfertaItem>, proveedor: String, nueva: Boolean) {
+        val admins = usuarios.findAllByEmpresaId(s.empresaId, Pageable.unpaged()).content.filter { it.rol == Rol.ADMIN_EMPRESA && it.activo }.map { it.id }
+        val total = ofertaDto(oferta, its, proveedor, items.findAllBySolicitudIdOrderByNombre(s.id)).total
+        val productos = its.size
+        notificaciones.avisar(
+            admins,
+            TipoNotificacion.OFERTA_RECIBIDA,
+            titulo = if (nueva) "$proveedor te envió una cotización" else "$proveedor actualizó su cotización",
+            mensaje = "${s.codigo}: $productos producto${if (productos == 1) "" else "s"} por USD ${total.toPlainString()}. Compárala en Compras.",
+            referenciaTipo = "SOLICITUD",
+            referenciaId = s.id,
+            referenciaTexto = s.codigo,
+        )
     }
 
     private fun invitada(id: UUID): Solicitud {
@@ -392,6 +431,8 @@ class SolicitudService(
             miOferta = mia?.let { ofertaDto(it, ofertaItems.findAllByOfertaIdIn(listOf(it.id)), proveedor.nombre, listaItems) },
             modalidadesDisponibles = proveedor.modalidades(),
             puedeOfertar = s.estado == EstadoSolicitud.EN_COTIZACION,
+            empresaContacto = fichas.de(s.empresaId),
+            plazoDias = plazoHasta(s),
         )
     }
 }

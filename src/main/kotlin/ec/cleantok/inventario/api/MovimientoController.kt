@@ -19,7 +19,7 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1")
-@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
 @Tag(name = "Movimientos")
 class MovimientoController(
     private val servicio: MovimientoService,

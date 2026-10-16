@@ -27,7 +27,7 @@ data class FotoDto(val id: UUID, val mime: String, val tamano: Long, val ancho: 
 
 @RestController
 @RequestMapping("/api/v1/fotos")
-@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
 @Tag(name = "Fotos")
 class FotoController(
     private val fotos: FotoService,

@@ -120,12 +120,12 @@ class SemillaDemoTest : PruebaIntegracion() {
         assertEquals("EN_COTIZACION", JsonPath.read<List<String>>(solicitudes, "$[?(@.codigo == 'SC-003')].estado").single())
         assertEquals(3, JsonPath.read<List<Int>>(solicitudes, "$[?(@.codigo == 'SC-003')].ofertas").single())
 
-        // El proveedor tiene una orden nueva por aceptar.
+        // El proveedor tiene una orden nueva, ya pagada: empieza a despacharla (no hay que aceptarla).
         val proclean = token("ventas@proclean.ec")
         val oc3 = mvc.get("/api/v1/ordenes-compra") { header("Authorization", proclean) }.andReturn().response.contentAsString
         val oc3Id = JsonPath.read<List<String>>(oc3, "$[?(@.codigo == 'OC-003')].id").single()
         val detalle = mvc.get("/api/v1/ordenes-compra/$oc3Id") { header("Authorization", proclean) }.andReturn().response.contentAsString
-        assertEquals(listOf("ACEPTADA", "RECHAZADA"), JsonPath.read<List<String>>(detalle, "$.acciones.siguientes[*].estado"))
+        assertEquals(listOf("EN_PREPARACION"), JsonPath.read<List<String>>(detalle, "$.acciones.siguientes[*].estado"))
 
         // El repartidor tiene su ruta con 4 paradas y la optimizada no es más larga.
         val ruta = mvc.get("/api/v1/rutas/mia") { header("Authorization", token("reparto@lahigiene.ec")) }.andReturn().response.contentAsString

@@ -218,11 +218,24 @@ data class DestinoProveedorDto(val establecimiento: RefDto, val direccion: Strin
 
 data class ItemProveedorDto(val id: UUID, val nombre: String, val unidad: Unidad, val cantidad: BigDecimal, val destinos: List<DestinoProveedorDto>)
 
+@Schema(description = "Empresa que cotiza o compra, como información para el proveedor")
+data class EmpresaContactoDto(
+    val id: UUID,
+    val razonSocial: String,
+    val ruc: String,
+    val telefono: String?,
+    @field:Schema(description = "Correo de la empresa o, si no lo registró, el de su administrador") val email: String?,
+    val direccion: String?,
+    val lat: BigDecimal?,
+    val lng: BigDecimal?,
+)
+
 data class SolicitudProveedorDto(
     val id: UUID,
     val codigo: String,
     val empresa: RefDto,
     val estado: EstadoSolicitud,
+    @field:Schema(description = "Fecha de entrega que fija la empresa; el proveedor no la cambia")
     val fechaRequerida: LocalDate,
     val nota: String?,
     val enviadaEn: OffsetDateTime?,
@@ -230,6 +243,10 @@ data class SolicitudProveedorDto(
     @field:Schema(description = "Mi oferta, si ya la envié (nunca se muestran las de otros proveedores)") val miOferta: OfertaDto?,
     val modalidadesDisponibles: List<Modalidad>,
     val puedeOfertar: Boolean,
+    @field:Schema(description = "Razón social, RUC, teléfono, correo, dirección y ubicación de la empresa")
+    val empresaContacto: EmpresaContactoDto? = null,
+    @field:Schema(description = "Días hasta la fecha requerida: es el plazo con el que se registra la oferta")
+    val plazoDias: Int = 0,
 )
 
 data class OfertaItemRequest(
@@ -241,8 +258,10 @@ data class OfertaItemRequest(
 )
 
 data class OfertaRequest(
-    @field:NotNull(message = "Indica cómo entregas") val modalidad: Modalidad?,
-    @field:NotNull @field:Min(0) @field:Max(60) val plazoDias: Int?,
+    @field:Schema(description = "Opcional: si se omite, la que ya tenía la oferta o la del proveedor (envío directo si lo ofrece)")
+    val modalidad: Modalidad? = null,
+    @field:Schema(description = "Se ignora: el plazo sale de la fecha requerida que fijó la empresa")
+    @field:Min(0) @field:Max(60) val plazoDias: Int? = null,
     @field:Size(max = 500) val nota: String? = null,
     @field:NotEmpty(message = "Oferta al menos un producto") @field:Valid val items: List<OfertaItemRequest>?,
 )
@@ -333,6 +352,32 @@ data class OrdenDto(
     val eventos: List<EventoDto>,
     val entregas: List<EntregaDto>,
     val acciones: AccionesOrdenDto,
+    @field:Schema(description = "La cotización que originó la orden (no se muestra al repartidor)") val cotizacion: CotizacionOrdenDto? = null,
+    @field:Schema(description = "Datos de la empresa compradora (para el proveedor)") val empresaContacto: EmpresaContactoDto? = null,
+)
+
+data class ItemCotizadoDto(
+    val nombre: String,
+    val unidad: Unidad,
+    val cantidadSolicitada: BigDecimal,
+    val cantidadOfertada: BigDecimal,
+    val precioUnitario: BigDecimal,
+    @field:Schema(description = "Este producto quedó en esta orden") val enEstaOrden: Boolean,
+)
+
+@Schema(description = "Solicitud y oferta que dieron origen a la orden")
+data class CotizacionOrdenDto(
+    val solicitud: RefDto,
+    val fechaRequerida: LocalDate,
+    val notaSolicitud: String?,
+    val solicitadaEn: OffsetDateTime?,
+    val ofertaEnviadaEn: OffsetDateTime,
+    val ofertadaPor: RefDto?,
+    val modalidad: Modalidad,
+    val plazoDias: Int,
+    val notaOferta: String?,
+    val totalOfertado: BigDecimal,
+    val items: List<ItemCotizadoDto>,
 )
 
 data class CambiarEstadoRequest(

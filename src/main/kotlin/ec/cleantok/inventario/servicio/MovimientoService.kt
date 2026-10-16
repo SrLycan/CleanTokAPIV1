@@ -105,7 +105,7 @@ class MovimientoService(
         val ocurridoEn = OffsetDateTime.now(clock)
         return tx.execute {
             val ubicacion = acceso.ubicacionVisible(ubicacionId)
-            if (ubicacion.esBodega && !usuario.esAdmin) throw soloAdminEnBodega()
+            if (ubicacion.esBodega && !usuario.gestionaSede) throw soloAdminEnBodega()
             var sinCambio = 0
             val ajustes = req.items!!.distinctBy { it.productoId }.mapNotNull { item ->
                 val producto = productos.findByIdAndEmpresaId(item.productoId!!, usuario.empresaId!!)
@@ -154,8 +154,8 @@ class MovimientoService(
 
     private fun aplicar(req: MovimientoRequest, usuario: UsuarioAutenticado, esConteo: Boolean = false, esRecepcion: Boolean = false): MovimientoResultadoDto {
         val tipo = req.tipo!!
-        if (tipo == TipoMovimiento.AJUSTE && !usuario.esAdmin && !esConteo) {
-            throw ApiException(HttpStatus.FORBIDDEN, CodigoError.NO_AUTORIZADO, "Solo el administrador puede registrar ajustes")
+        if (tipo == TipoMovimiento.AJUSTE && !usuario.gestionaSede && !esConteo) {
+            throw ApiException(HttpStatus.FORBIDDEN, CodigoError.NO_AUTORIZADO, "Solo el administrador o el supervisor de la sede puede registrar ajustes")
         }
         val ubicacion = acceso.ubicacionVisible(req.ubicacionId!!)
         if (!ubicacion.activo) throw ValidacionException("La ubicación está desactivada")
@@ -167,7 +167,7 @@ class MovimientoService(
         }
         // El stock de la bodega solo lo carga el admin (orden de compra, recepción o ingreso). El encargado
         // mueve entre bodega y pisos (traslado, devolución) y registra consumos.
-        if (tipo == TipoMovimiento.INGRESO && !usuario.esAdmin && !esRecepcion) throw soloAdminEnBodega()
+        if (tipo == TipoMovimiento.INGRESO && !usuario.gestionaSede && !esRecepcion) throw soloAdminEnBodega()
 
         val ahora = clock.instant()
         val ocurridoEn = req.ocurridoEn!!.toInstant()

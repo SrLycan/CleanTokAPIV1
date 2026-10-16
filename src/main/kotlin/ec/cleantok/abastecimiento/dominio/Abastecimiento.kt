@@ -21,7 +21,7 @@ enum class Modalidad { ENVIO_DIRECTO, RETIRO_LOCAL, RETIRO_BODEGA }
 enum class EstadoOferta { ENVIADA, ADJUDICADA, NO_ADJUDICADA }
 
 /**
- * Estados de la orden de compra. Envío directo: APROBADA → ACEPTADA → EN_PREPARACION → EMPACADA → DESPACHADA
+ * Estados de la orden de compra. Envío directo: APROBADA (pagada) → EN_PREPARACION → EMPACADA → DESPACHADA
  * ("salió de bodega") → EN_TRANSITO → ENTREGADA. Retiro: … → EMPACADA → LISTA_PARA_RETIRO → RETIRADA → ENTREGADA.
  * ENTREGADA llega sola cuando todos los destinos confirman la recepción.
  */

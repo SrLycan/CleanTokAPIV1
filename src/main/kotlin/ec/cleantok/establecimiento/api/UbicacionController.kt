@@ -31,51 +31,51 @@ class UbicacionController(
     private val qr: QrService,
 ) {
     @GetMapping("/establecimientos/{id}/ubicaciones")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
     @Operation(summary = "Bodega, pisos y áreas del establecimiento en orden")
     fun listar(@PathVariable id: UUID): List<UbicacionDto> = servicio.listar(id)
 
     @PostMapping("/establecimientos/{id}/ubicaciones")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Crea un piso o área con su QR")
     fun crear(@PathVariable id: UUID, @Valid @RequestBody req: CrearUbicacionRequest): UbicacionDto = servicio.crear(id, req)
 
     @PutMapping("/establecimientos/{id}/ubicaciones/orden")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Reordena las ubicaciones según la lista enviada")
     fun ordenar(@PathVariable id: UUID, @Valid @RequestBody req: OrdenarUbicacionesRequest): List<UbicacionDto> =
         servicio.ordenar(id, req.ubicacionIds)
 
     @PutMapping("/ubicaciones/{id}")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Renombra o cambia el tipo (PISO/AREA) de una ubicación")
     fun actualizar(@PathVariable id: UUID, @Valid @RequestBody req: ActualizarUbicacionRequest): UbicacionDto =
         servicio.actualizar(id, req)
 
     @PatchMapping("/ubicaciones/{id}/desactivar")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Desactiva un piso o área (la bodega no se puede desactivar); su QR deja de funcionar")
     fun desactivar(@PathVariable id: UUID): UbicacionDto = servicio.cambiarActivo(id, false)
 
     @PatchMapping("/ubicaciones/{id}/activar")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Reactiva una ubicación")
     fun activar(@PathVariable id: UUID): UbicacionDto = servicio.cambiarActivo(id, true)
 
     @PostMapping("/ubicaciones/{id}/regenerar-qr")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Genera un QR nuevo e invalida el anterior (hay que reimprimirlo)")
     fun regenerarQr(@PathVariable id: UUID): UbicacionDto = servicio.regenerarQr(id)
 
     @GetMapping("/ubicaciones/{id}/qr.png", produces = [MediaType.IMAGE_PNG_VALUE])
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Imagen PNG del QR de la ubicación")
     fun qrPng(@PathVariable id: UUID, @RequestParam(defaultValue = "512") tamano: Int): ResponseEntity<ByteArray> =
         ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(qr.png(id, tamano))
 
     @GetMapping("/establecimientos/{id}/qr-hoja.pdf", produces = [MediaType.APPLICATION_PDF_VALUE])
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Hoja A4 imprimible con los QR de todas las ubicaciones activas (4 por página)")
     fun qrHoja(@PathVariable id: UUID): ResponseEntity<ByteArray> {
         val (nombre, pdf) = qr.hojaPdf(id)

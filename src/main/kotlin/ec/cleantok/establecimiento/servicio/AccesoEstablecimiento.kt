@@ -15,7 +15,7 @@ import java.util.UUID
 /**
  * Regla única de acceso a un establecimiento, reutilizada por todos los módulos:
  * - ADMIN_EMPRESA: cualquier establecimiento de su empresa.
- * - ENCARGADO: solo los activos que tiene asignados.
+ * - SUPERVISOR (supervisor de establecimiento) y ENCARGADO: solo los activos que tiene asignados.
  * Fuera de eso, 404 (no se revela si el recurso existe).
  */
 @Component
@@ -26,7 +26,7 @@ class AccesoEstablecimiento(
 ) {
     fun puedeOperar(usuario: UsuarioAutenticado, establecimiento: Establecimiento): Boolean = when (usuario.rol) {
         Rol.ADMIN_EMPRESA -> establecimiento.empresaId == usuario.empresaId
-        Rol.ENCARGADO -> establecimiento.empresaId == usuario.empresaId && establecimiento.activo &&
+        Rol.SUPERVISOR, Rol.ENCARGADO -> establecimiento.empresaId == usuario.empresaId && establecimiento.activo &&
             asignaciones.existsByUsuarioIdAndEstablecimientoId(usuario.id, establecimiento.id)
         Rol.SUPER_ADMIN, Rol.PROVEEDOR, Rol.REPARTIDOR -> false
     }
@@ -39,12 +39,25 @@ class AccesoEstablecimiento(
         return e
     }
 
-    /** Establecimiento de la empresa del admin (incluye inactivos). El rol se exige en el controlador. */
-    fun deMiEmpresa(id: UUID): Establecimiento =
-        establecimientos.findByIdAndEmpresaId(id, ContextoSeguridad.empresaId()) ?: throw NoEncontradoException("Establecimiento")
+    /**
+     * Establecimiento que el usuario administra: cualquiera de su empresa (incluye inactivos) para el admin; para el
+     * supervisor, solo los suyos. El rol se exige en el controlador.
+     */
+    fun deMiEmpresa(id: UUID): Establecimiento {
+        val e = establecimientos.findByIdAndEmpresaId(id, ContextoSeguridad.empresaId()) ?: throw NoEncontradoException("Establecimiento")
+        val usuario = ContextoSeguridad.usuario()
+        if (usuario.esSupervisor && !puedeOperar(usuario, e)) throw NoEncontradoException("Establecimiento")
+        return e
+    }
 
-    fun ubicacionDeMiEmpresa(id: UUID): Ubicacion =
-        ubicaciones.findByIdAndEmpresaId(id, ContextoSeguridad.empresaId()) ?: throw NoEncontradoException("Ubicación")
+    fun ubicacionDeMiEmpresa(id: UUID): Ubicacion {
+        val u = ubicaciones.findByIdAndEmpresaId(id, ContextoSeguridad.empresaId()) ?: throw NoEncontradoException("Ubicación")
+        if (ContextoSeguridad.usuario().esSupervisor) {
+            val e = establecimientos.findById(u.establecimientoId).orElse(null)
+            if (e == null || !puedeOperar(ContextoSeguridad.usuario(), e)) throw NoEncontradoException("Ubicación")
+        }
+        return u
+    }
 
     /** Ubicación que el usuario actual puede operar (vía su establecimiento). */
     fun ubicacionVisible(id: UUID): Ubicacion {

@@ -44,6 +44,8 @@ Contraseña de todos: **`Demo2026!`**
 | `admin@andina.ec` | ADMIN_EMPRESA | Limpieza Andina Cía. Ltda. | Oficinas Municipales Centro, Planta Textil La Esperanza |
 | `ana@andina.ec` | ENCARGADO | Limpieza Andina | Oficinas Municipales |
 | `pedro@andina.ec` | ENCARGADO | Limpieza Andina | Planta Textil |
+| `supervisor@brillototal.ec` | SUPERVISOR (supervisor de establecimiento) | Brillo Total | solo Hospital |
+| `supervisor@andina.ec` | SUPERVISOR (supervisor de establecimiento) | Limpieza Andina | solo Planta Textil |
 | `superadmin@cleantok.ec` / `SuperAdmin2026!` | SUPER_ADMIN | — | crea empresas y admins |
 
 Brillo Total tiene además **Clínica Los Valles**, **Edificio Plaza Norte** y **Colegio Bilingüe Los Andes** (Quito), para que
@@ -66,7 +68,7 @@ Pedidos que deja preparados la semilla:
 | Empresa | Qué | Para mostrar |
 |---|---|---|
 | Brillo | SC-003 en cotización con 3 ofertas | comparar ofertas y aprobar la compra (admin) |
-| Brillo | OC-003 recién aprobada (ProClean) | aceptar, preparar, empacar y asignar repartidor (proveedor) |
+| Brillo | OC-003 recién aprobada y pagada (ProClean) | empezar a despachar, empacar y asignar repartidor (proveedor) |
 | Brillo | OC-002 en tránsito con 4 destinos (La Higiene, repartidor Diego) | ruta optimizada (repartidor) y confirmar recepción (María, Luis) |
 | Brillo | OC-001 entregada | rastreo completo |
 | Andina | OC-001 lista para retiro en el local del proveedor | modalidad de retiro |

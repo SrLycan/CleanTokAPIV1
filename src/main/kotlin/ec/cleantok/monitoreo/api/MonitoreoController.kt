@@ -28,7 +28,7 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1")
-@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
 @Tag(name = "Nivel y alertas")
 class MonitoreoController(
     private val reportes: ReporteNivelService,
@@ -62,7 +62,7 @@ class MonitoreoController(
         alertas.atender(id, req?.nota)
 
     @PostMapping("/establecimientos/{id}/alertas/reevaluar")
-    @PreAuthorize("hasRole('ADMIN_EMPRESA')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR')")
     @Operation(summary = "Reevalúa ahora las reglas de alerta del establecimiento (lo mismo que hace el job cada hora)")
     fun reevaluar(@PathVariable id: UUID): List<AlertaDto> = alertas.reevaluar(id)
 }

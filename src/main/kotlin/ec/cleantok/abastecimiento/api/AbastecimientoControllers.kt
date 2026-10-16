@@ -147,7 +147,7 @@ class ProveedorController(
 /** Órdenes de compra y su rastreo. Cada rol ve las suyas: empresa, encargado (sus destinos), proveedor y repartidor. */
 @RestController
 @RequestMapping("/api/v1")
-@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO', 'PROVEEDOR', 'REPARTIDOR')")
+@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO', 'PROVEEDOR', 'REPARTIDOR')")
 @Tag(name = "Órdenes de compra y entregas")
 class OrdenCompraController(
     private val ordenes: OrdenCompraService,
@@ -164,7 +164,7 @@ class OrdenCompraController(
     @PostMapping("/ordenes-compra/{id}/estado")
     @Operation(
         summary = "Avanza el estado del pedido",
-        description = "Proveedor: ACEPTADA/RECHAZADA, EN_PREPARACION, EMPACADA, DESPACHADA o LISTA_PARA_RETIRO, EN_TRANSITO, RETIRADA. " +
+        description = "Proveedor (la orden llega aprobada y pagada, no se acepta): EN_PREPARACION, EMPACADA, DESPACHADA o LISTA_PARA_RETIRO, EN_TRANSITO, RETIRADA. " +
             "Repartidor: DESPACHADA y EN_TRANSITO. Admin: RETIRADA. `acciones.siguientes` dice cuáles aplican.",
     )
     fun estado(@PathVariable id: UUID, @Valid @RequestBody req: CambiarEstadoRequest): OrdenDto = ordenes.cambiarEstado(id, req.estado!!, req.nota)
@@ -182,7 +182,7 @@ class OrdenCompraController(
         ordenes.marcarEntregada(id, entregaId, req?.nota)
 
     @PostMapping("/ordenes-compra/{id}/entregas/{entregaId}/recibir")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
     @Operation(
         summary = "Confirma la recepción en el destino",
         description = "Registra un INGRESO en la bodega por cada producto recibido (enlazado al kardex). Cuando todos los destinos confirman, la orden queda ENTREGADA.",

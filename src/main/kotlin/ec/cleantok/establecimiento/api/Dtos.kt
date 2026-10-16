@@ -7,7 +7,11 @@ import ec.cleantok.establecimiento.dominio.Establecimiento
 import ec.cleantok.establecimiento.dominio.TipoEstablecimiento
 import ec.cleantok.establecimiento.dominio.TipoUbicacion
 import ec.cleantok.establecimiento.dominio.Ubicacion
+import ec.cleantok.identidad.api.UsuarioDto
+import ec.cleantok.identidad.dominio.Rol
 import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.NotBlank
@@ -28,7 +32,26 @@ data class EstablecimientoRequest(
     @field:DecimalMin("-90") @field:DecimalMax("90") @field:Schema(example = "-2.170998") val lat: BigDecimal? = null,
     @field:DecimalMin("-180") @field:DecimalMax("180") @field:Schema(example = "-79.922359") val lng: BigDecimal? = null,
     @field:Positive(message = "El área debe ser mayor que 0") @field:Schema(example = "809") val areaM2: BigDecimal? = null,
+    @field:Schema(description = "Solo al crear: supervisor de establecimiento existente (rol SUPERVISOR de la empresa)")
+    val supervisorId: UUID? = null,
+    @field:Schema(description = "Solo al crear: cuenta nueva de supervisor (recibe una clave temporal)")
+    @field:Valid
+    val nuevoSupervisor: NuevoSupervisorRequest? = null,
 )
+
+data class NuevoSupervisorRequest(
+    @field:NotBlank(message = "El nombre del supervisor es obligatorio") @field:Size(max = 200) val nombre: String,
+    @field:NotBlank(message = "El email del supervisor es obligatorio") @field:Email(message = "El email del supervisor no es válido")
+    val email: String,
+)
+
+@Schema(description = "Supervisor de la sede: uno existente, una cuenta nueva o ninguno (ambos vacíos lo quitan)")
+data class SupervisorRequest(
+    val supervisorId: UUID? = null,
+    @field:Valid val nuevoSupervisor: NuevoSupervisorRequest? = null,
+)
+
+data class SupervisorDto(val id: UUID, val nombre: String, val email: String, val activo: Boolean)
 
 data class EstablecimientoDto(
     val id: UUID,
@@ -43,10 +66,13 @@ data class EstablecimientoDto(
     @field:Schema(description = "Id de la bodega del establecimiento") val bodegaId: UUID?,
     @field:Schema(description = "Si quien consulta puede eliminarlo: el admin que lo creó o el administrador de la plataforma")
     val puedeEliminar: Boolean = false,
+    @field:Schema(description = "Supervisor de establecimiento asignado, si tiene") val supervisor: SupervisorDto? = null,
+    @field:Schema(description = "Solo si se acaba de crear la cuenta del supervisor: su clave temporal (se muestra una vez)")
+    val credencialSupervisor: UsuarioDto? = null,
 ) {
     companion object {
-        fun de(e: Establecimiento, bodegaId: UUID?, puedeEliminar: Boolean = false) = EstablecimientoDto(
-            e.id, e.nombre, e.tipo, e.entidadContratante, e.direccion, e.lat, e.lng, e.areaM2, e.activo, bodegaId, puedeEliminar,
+        fun de(e: Establecimiento, bodegaId: UUID?, puedeEliminar: Boolean = false, supervisor: SupervisorDto? = null) = EstablecimientoDto(
+            e.id, e.nombre, e.tipo, e.entidadContratante, e.direccion, e.lat, e.lng, e.areaM2, e.activo, bodegaId, puedeEliminar, supervisor,
         )
     }
 }
@@ -57,7 +83,7 @@ data class AsignarEncargadosRequest(
     val usuarioIds: List<UUID>,
 )
 
-data class EncargadoAsignadoDto(val id: UUID, val nombre: String, val email: String, val activo: Boolean)
+data class EncargadoAsignadoDto(val id: UUID, val nombre: String, val email: String, val activo: Boolean, val rol: Rol = Rol.ENCARGADO)
 
 data class CrearUbicacionRequest(
     @field:NotBlank(message = "El nombre es obligatorio") @field:Size(max = 120)

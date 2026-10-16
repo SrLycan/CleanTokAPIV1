@@ -37,7 +37,7 @@ class UbicacionService(
     @Transactional(readOnly = true)
     fun listar(establecimientoId: UUID): List<UbicacionDto> {
         val e = acceso.visible(establecimientoId)
-        val admin = ContextoSeguridad.usuario().esAdmin
+        val admin = ContextoSeguridad.usuario().gestionaSede
         return ubicaciones.findAllByEstablecimientoIdOrderByOrdenAscNombreAsc(e.id)
             .filter { admin || it.activo }
             .map { dto(it, admin) }

@@ -32,7 +32,7 @@ import java.util.UUID
 class ProductoController(private val servicio: ProductoService) {
 
     @GetMapping("/establecimientos/{id}/productos")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
     @Operation(summary = "Catálogo de productos del establecimiento (el encargado solo ve los activos)")
     fun listar(
         @PathVariable id: UUID,
@@ -50,7 +50,7 @@ class ProductoController(private val servicio: ProductoService) {
     fun crear(@PathVariable id: UUID, @Valid @RequestBody req: ProductoRequest): ProductoDto = servicio.crearManual(id, req)
 
     @GetMapping("/productos/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
     @Operation(summary = "Obtiene un producto")
     fun obtener(@PathVariable id: UUID): ProductoDto = servicio.obtener(id)
 

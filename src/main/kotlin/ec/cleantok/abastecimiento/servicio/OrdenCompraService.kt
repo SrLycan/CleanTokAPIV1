@@ -1,6 +1,8 @@
 package ec.cleantok.abastecimiento.servicio
 
 import ec.cleantok.abastecimiento.api.AccionesOrdenDto
+import ec.cleantok.abastecimiento.api.CotizacionOrdenDto
+import ec.cleantok.abastecimiento.api.ItemCotizadoDto
 import ec.cleantok.abastecimiento.api.EntregaDto
 import ec.cleantok.abastecimiento.api.EventoDto
 import ec.cleantok.abastecimiento.api.LineaOrdenDto
@@ -19,7 +21,11 @@ import ec.cleantok.abastecimiento.dominio.EventoOrdenRepository
 import ec.cleantok.abastecimiento.dominio.Modalidad
 import ec.cleantok.abastecimiento.dominio.OrdenCompra
 import ec.cleantok.abastecimiento.dominio.OrdenCompraRepository
+import ec.cleantok.abastecimiento.dominio.OfertaItemRepository
+import ec.cleantok.abastecimiento.dominio.OfertaRepository
 import ec.cleantok.abastecimiento.dominio.OrdenLineaRepository
+import ec.cleantok.abastecimiento.dominio.SolicitudItemRepository
+import ec.cleantok.abastecimiento.dominio.SolicitudLineaRepository
 import ec.cleantok.abastecimiento.dominio.SolicitudRepository
 import ec.cleantok.catalogo.dominio.ProductoRepository
 import ec.cleantok.comun.Zona
@@ -49,9 +55,10 @@ import java.util.UUID
 
 /**
  * Órdenes de compra: quién las ve, cómo avanzan y el rastreo de cada paso.
- * - Proveedor: acepta o rechaza, prepara, empaca, despacha (o deja listo para retiro) y asigna repartidor.
+ * - Proveedor: la orden llega aprobada y pagada, así que no se acepta: empieza a despachar (preparar), empaca,
+ *   despacha (o deja listo para retiro) y asigna repartidor.
  * - Repartidor: marca "salió de bodega", "en tránsito" y cada destino entregado.
- * - Encargado (o admin): confirma la recepción en su establecimiento; eso registra el INGRESO a bodega.
+ * - Encargado, supervisor de la sede (o admin): confirma la recepción en su establecimiento; eso registra el INGRESO a bodega.
  * Cuando todos los destinos confirman, la orden pasa sola a ENTREGADA.
  */
 @Service
@@ -61,6 +68,11 @@ class OrdenCompraService(
     private val lineas: OrdenLineaRepository,
     private val eventos: EventoOrdenRepository,
     private val solicitudes: SolicitudRepository,
+    private val solicitudItems: SolicitudItemRepository,
+    private val solicitudLineas: SolicitudLineaRepository,
+    private val ofertas: OfertaRepository,
+    private val ofertaItems: OfertaItemRepository,
+    private val fichas: FichaEmpresa,
     private val empresas: EmpresaRepository,
     private val proveedores: ProveedorRepository,
     private val usuarios: UsuarioRepository,
@@ -77,7 +89,7 @@ class OrdenCompraService(
         val u = ContextoSeguridad.usuario()
         val lista = when (u.rol) {
             Rol.ADMIN_EMPRESA -> ordenes.findAllByEmpresaIdOrderByCreatedAtDesc(u.empresaId!!)
-            Rol.ENCARGADO -> ordenes.conEntregasPara(u.id)
+            Rol.SUPERVISOR, Rol.ENCARGADO -> ordenes.conEntregasPara(u.id)
             Rol.PROVEEDOR -> ordenes.findAllByProveedorIdOrderByCreatedAtDesc(u.proveedorId!!)
             Rol.REPARTIDOR -> ordenes.findAllByRepartidorIdOrderByCreatedAtDesc(u.id)
             Rol.SUPER_ADMIN -> emptyList()
@@ -195,7 +207,7 @@ class OrdenCompraService(
         val o = ordenes.findById(id).orElse(null)
         val ve = o != null && when (u.rol) {
             Rol.ADMIN_EMPRESA -> o.empresaId == u.empresaId
-            Rol.ENCARGADO -> o.empresaId == u.empresaId &&
+            Rol.SUPERVISOR, Rol.ENCARGADO -> o.empresaId == u.empresaId &&
                 entregas.findAllByOrdenIdOrderByParada(o.id).any { asignaciones.existsByUsuarioIdAndEstablecimientoId(u.id, it.establecimientoId) }
             Rol.PROVEEDOR -> o.proveedorId == u.proveedorId
             Rol.REPARTIDOR -> o.repartidorId == u.id
@@ -210,8 +222,9 @@ class OrdenCompraService(
         val repartidor = u.esRepartidor && o.repartidorId == u.id
         val admin = u.esAdmin && o.empresaId == u.empresaId
         return when (o.estado) {
-            EstadoOrden.APROBADA -> if (proveedor) listOf(EstadoOrden.ACEPTADA, EstadoOrden.RECHAZADA) else emptyList()
-            EstadoOrden.ACEPTADA -> if (proveedor) listOf(EstadoOrden.EN_PREPARACION) else emptyList()
+            // La empresa ya pagó al aprobar: el proveedor no la acepta ni la rechaza, empieza a despachar.
+            // ACEPTADA solo queda en órdenes anteriores a este cambio.
+            EstadoOrden.APROBADA, EstadoOrden.ACEPTADA -> if (proveedor) listOf(EstadoOrden.EN_PREPARACION) else emptyList()
             EstadoOrden.EN_PREPARACION -> if (proveedor) listOf(EstadoOrden.EMPACADA) else emptyList()
             EstadoOrden.EMPACADA -> when {
                 o.esEnvio && (proveedor || repartidor) -> listOf(EstadoOrden.DESPACHADA)
@@ -226,7 +239,7 @@ class OrdenCompraService(
 
     private fun puedeAsignar(o: OrdenCompra, u: UsuarioAutenticado) =
         u.esProveedor && o.proveedorId == u.proveedorId && o.esEnvio &&
-            o.estado in setOf(EstadoOrden.ACEPTADA, EstadoOrden.EN_PREPARACION, EstadoOrden.EMPACADA, EstadoOrden.DESPACHADA)
+            o.estado in setOf(EstadoOrden.APROBADA, EstadoOrden.ACEPTADA, EstadoOrden.EN_PREPARACION, EstadoOrden.EMPACADA, EstadoOrden.DESPACHADA)
 
     private fun marcables(o: OrdenCompra, u: UsuarioAutenticado): List<UUID> {
         val actor = (u.esProveedor && o.proveedorId == u.proveedorId) || (u.esRepartidor && o.repartidorId == u.id)
@@ -238,7 +251,7 @@ class OrdenCompraService(
         if (o.estado !in EN_CAMINO + EstadoOrden.RETIRADA || o.empresaId != u.empresaId) return emptyList()
         return entregas.findAllByOrdenIdOrderByParada(o.id).filter { e ->
             e.estado != EstadoEntrega.RECIBIDA &&
-                (u.esAdmin || (u.esEncargado && asignaciones.existsByUsuarioIdAndEstablecimientoId(u.id, e.establecimientoId)))
+                (u.esAdmin || ((u.esEncargado || u.esSupervisor) && asignaciones.existsByUsuarioIdAndEstablecimientoId(u.id, e.establecimientoId)))
         }.map { it.id }
     }
 
@@ -346,6 +359,36 @@ class OrdenCompraService(
                 marcarEntregada = marcables(o, u),
                 recibir = recibiblesIds,
             ),
+            cotizacion = if (ocultarPrecios) null else cotizacion(o),
+            empresaContacto = if (u.esProveedor) fichas.de(o.empresaId) else null,
+        )
+    }
+
+    /** Solicitud y oferta que originaron la orden: lo que se pidió, lo que el proveedor cotizó y lo que quedó aquí. */
+    private fun cotizacion(o: OrdenCompra): CotizacionOrdenDto? {
+        val oferta = ofertas.findById(o.ofertaId).orElse(null) ?: return null
+        val s = solicitudes.findById(o.solicitudId).orElse(null) ?: return null
+        val cotizados = ofertaItems.findAllByOfertaIdIn(listOf(oferta.id)).associateBy { it.itemId }
+        val enOrden = solicitudLineas.findAllById(lineas.findAllByOrdenId(o.id).map { it.solicitudLineaId }).map { it.itemId }.toSet()
+        val items = solicitudItems.findAllBySolicitudIdOrderByNombre(s.id).mapNotNull { item ->
+            cotizados[item.id]?.let { oi ->
+                ItemCotizadoDto(item.nombre, item.unidad, item.cantidad, oi.cantidadDisponible, oi.precioUnitario, item.id in enOrden)
+            }
+        }
+        val total = items.fold(java.math.BigDecimal.ZERO) { acc, i -> acc.add(i.cantidadOfertada.min(i.cantidadSolicitada).multiply(i.precioUnitario)) }
+            .setScale(2, RoundingMode.HALF_UP)
+        return CotizacionOrdenDto(
+            solicitud = RefDto(s.id, s.codigo),
+            fechaRequerida = s.fechaRequerida,
+            notaSolicitud = s.nota,
+            solicitadaEn = s.enviadaEn?.let(Zona::presentar),
+            ofertaEnviadaEn = Zona.presentar(oferta.enviadaEn),
+            ofertadaPor = usuarios.findById(oferta.usuarioId).map { RefDto(it.id, it.nombre) }.orElse(null),
+            modalidad = oferta.modalidad,
+            plazoDias = oferta.plazoDias,
+            notaOferta = oferta.nota,
+            totalOfertado = total,
+            items = items,
         )
     }
 
@@ -356,7 +399,8 @@ class OrdenCompraService(
             o.esEnvio -> CAMINO_ENVIO
             else -> CAMINO_RETIRO
         }
-        val actual = camino.indexOf(o.estado)
+        // Órdenes anteriores al cambio que quedaron "aceptadas": van en el paso de aprobada y pagada.
+        val actual = camino.indexOf(if (o.estado == EstadoOrden.ACEPTADA) EstadoOrden.APROBADA else o.estado)
         return camino.mapIndexed { i, estado ->
             val fecha = evs.firstOrNull { it.estado == estado.name }?.ocurridoEn?.let(Zona::presentar)
             PasoDto(estado, titulo(estado), fecha, hecho = i <= actual, actual = i == actual)
@@ -383,20 +427,21 @@ class OrdenCompraService(
 
     companion object {
         private val EN_CAMINO = setOf(EstadoOrden.DESPACHADA, EstadoOrden.EN_TRANSITO)
+        // Sin "aceptado": la orden llega pagada y el proveedor empieza a despacharla.
         private val CAMINO_ENVIO = listOf(
-            EstadoOrden.APROBADA, EstadoOrden.ACEPTADA, EstadoOrden.EN_PREPARACION, EstadoOrden.EMPACADA,
+            EstadoOrden.APROBADA, EstadoOrden.EN_PREPARACION, EstadoOrden.EMPACADA,
             EstadoOrden.DESPACHADA, EstadoOrden.EN_TRANSITO, EstadoOrden.ENTREGADA,
         )
         private val CAMINO_RETIRO = listOf(
-            EstadoOrden.APROBADA, EstadoOrden.ACEPTADA, EstadoOrden.EN_PREPARACION, EstadoOrden.EMPACADA,
+            EstadoOrden.APROBADA, EstadoOrden.EN_PREPARACION, EstadoOrden.EMPACADA,
             EstadoOrden.LISTA_PARA_RETIRO, EstadoOrden.RETIRADA, EstadoOrden.ENTREGADA,
         )
 
         fun titulo(e: EstadoOrden): String = when (e) {
-            EstadoOrden.APROBADA -> "Orden aprobada y enviada al proveedor"
+            EstadoOrden.APROBADA -> "Orden aprobada y pagada"
             EstadoOrden.ACEPTADA -> "Pedido aceptado por el proveedor"
             EstadoOrden.RECHAZADA -> "Pedido rechazado por el proveedor"
-            EstadoOrden.EN_PREPARACION -> "En preparación"
+            EstadoOrden.EN_PREPARACION -> "Despacho en preparación"
             EstadoOrden.EMPACADA -> "Empacado"
             EstadoOrden.LISTA_PARA_RETIRO -> "Listo para retiro"
             EstadoOrden.RETIRADA -> "Retirado por la empresa"

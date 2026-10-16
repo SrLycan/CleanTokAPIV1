@@ -7,6 +7,7 @@ import ec.cleantok.abastecimiento.api.ProveedorPlataformaDto
 import ec.cleantok.abastecimiento.servicio.ProveedorService
 import ec.cleantok.comun.error.NoEncontradoException
 import ec.cleantok.establecimiento.api.EstablecimientoDto
+import ec.cleantok.establecimiento.api.EstablecimientoRequest
 import ec.cleantok.establecimiento.servicio.EstablecimientoService
 import ec.cleantok.comun.error.ValidacionException
 import ec.cleantok.identidad.api.UsuarioDto
@@ -52,6 +53,13 @@ data class EmpresaPlataformaDto(
     val usuarios: Long,
     val proveedores: Long,
     val admins: List<UsuarioDto>,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "Supervisores de establecimiento, con sus sedes")
+    val supervisores: List<UsuarioDto> = emptyList(),
+    val telefono: String? = null,
+    val email: String? = null,
+    val direccion: String? = null,
+    val lat: java.math.BigDecimal? = null,
+    val lng: java.math.BigDecimal? = null,
 )
 
 /**
@@ -94,22 +102,36 @@ class PlataformaService(
         return dto(e)
     }
 
+    /** Supervisores de establecimiento de una empresa, para asignarlos a una sede. */
+    @Transactional(readOnly = true)
+    fun supervisores(empresaId: UUID): List<UsuarioDto> {
+        if (!empresas.existsById(empresaId)) throw NoEncontradoException("Empresa")
+        return usuarios.findAllByEmpresaId(empresaId, Pageable.unpaged()).filter { it.rol == Rol.SUPERVISOR }.sortedBy { it.nombre }
+            .map { cuentas.dtoDe(it) }
+    }
+
     private fun dto(e: ec.cleantok.identidad.dominio.Empresa): EmpresaPlataformaDto {
         val p = mapOf("e" to e.id)
+        val gente = usuarios.findAllByEmpresaId(e.id, Pageable.unpaged()).content
         return EmpresaPlataformaDto(
             e.id, e.nombre, e.ruc, e.activo,
             establecimientos = jdbc.queryForObject("select count(*) from establecimiento where empresa_id = :e and activo", p, Long::class.java)!!,
             usuarios = usuarios.countByEmpresaId(e.id),
             proveedores = jdbc.queryForObject("select count(*) from empresa_proveedor where empresa_id = :e", p, Long::class.java)!!,
-            admins = usuarios.findAllByEmpresaId(e.id, Pageable.unpaged()).filter { it.rol == Rol.ADMIN_EMPRESA }.sortedBy { it.nombre }.map { UsuarioDto.de(it) },
+            admins = gente.filter { it.rol == Rol.ADMIN_EMPRESA }.sortedBy { it.nombre }.map { UsuarioDto.de(it) },
+            supervisores = gente.filter { it.rol == Rol.SUPERVISOR }.sortedBy { it.nombre }.map { cuentas.dtoDe(it) },
+            telefono = e.telefono, email = e.email, direccion = e.direccion, lat = e.lat, lng = e.lng,
         )
     }
 
-    /** Para cuando una organización pierde el acceso de su responsable. Solo admins de empresa y usuarios de ventas. */
+    /**
+     * Para cuando una organización pierde el acceso de su responsable. Admins de empresa, supervisores de
+     * establecimiento (los asigna la plataforma) y usuarios de ventas.
+     */
     @Transactional
     fun restablecerResponsable(id: UUID): UsuarioDto {
         val u = usuarios.findById(id).orElseThrow { NoEncontradoException("Usuario") }
-        if (u.rol !in setOf(Rol.ADMIN_EMPRESA, Rol.PROVEEDOR)) {
+        if (u.rol !in setOf(Rol.ADMIN_EMPRESA, Rol.SUPERVISOR, Rol.PROVEEDOR)) {
             throw ValidacionException("Desde la plataforma solo se restablece a responsables; el resto lo gestiona su organización")
         }
         return cuentas.restablecer(u)
@@ -139,8 +161,22 @@ class PlataformaController(
         servicio.cambiarActivoEmpresa(id, req.activo!!)
 
     @GetMapping("/empresas/{id}/establecimientos")
-    @Operation(summary = "Establecimientos de una empresa (para eliminarlos: DELETE /establecimientos/{id})")
+    @Operation(summary = "Establecimientos de una empresa con su supervisor (para eliminarlos: DELETE /establecimientos/{id})")
     fun establecimientosDeEmpresa(@PathVariable id: UUID): List<EstablecimientoDto> = establecimientos.deEmpresa(id)
+
+    @PostMapping("/empresas/{id}/establecimientos")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(
+        summary = "Crea una sede para la empresa y le asigna su supervisor de establecimiento",
+        description = "`supervisorId` (un SUPERVISOR existente de la empresa) o `nuevoSupervisor` (cuenta nueva con clave temporal). " +
+            "Para cambiarlo después: PUT /establecimientos/{id}/supervisor.",
+    )
+    fun crearEstablecimiento(@PathVariable id: UUID, @Valid @RequestBody req: EstablecimientoRequest): EstablecimientoDto =
+        establecimientos.crearParaEmpresa(id, req)
+
+    @GetMapping("/empresas/{id}/supervisores")
+    @Operation(summary = "Supervisores de establecimiento de una empresa")
+    fun supervisores(@PathVariable id: UUID): List<UsuarioDto> = servicio.supervisores(id)
 
     @GetMapping("/proveedores")
     @Operation(summary = "Proveedores de la plataforma, activos e inactivos")
@@ -157,6 +193,6 @@ class PlataformaController(
         proveedores.cambiarActivo(id, req.activo!!)
 
     @PostMapping("/usuarios/{id}/restablecer-clave")
-    @Operation(summary = "Clave temporal nueva para el admin de una empresa o el usuario de ventas de un proveedor")
+    @Operation(summary = "Clave temporal nueva para el admin o un supervisor de una empresa, o el usuario de ventas de un proveedor")
     fun restablecer(@PathVariable id: UUID): UsuarioDto = servicio.restablecerResponsable(id)
 }

@@ -10,7 +10,8 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
-enum class Rol { SUPER_ADMIN, ADMIN_EMPRESA, ENCARGADO, PROVEEDOR, REPARTIDOR }
+/** SUPERVISOR: "Supervisor de establecimiento", controla solo las sedes que tiene asignadas. */
+enum class Rol { SUPER_ADMIN, ADMIN_EMPRESA, SUPERVISOR, ENCARGADO, PROVEEDOR, REPARTIDOR }
 
 @Entity
 @Table(name = "empresa")
@@ -21,6 +22,13 @@ class Empresa(
     /** Desactivada por la plataforma: su gente no puede entrar y sus sesiones se cierran. */
     @Column(nullable = false)
     var activo: Boolean = true
+
+    // Datos de contacto: los ve el proveedor que cotiza o atiende sus órdenes.
+    var telefono: String? = null
+    var email: String? = null
+    var direccion: String? = null
+    var lat: BigDecimal? = null
+    var lng: BigDecimal? = null
 }
 
 /**

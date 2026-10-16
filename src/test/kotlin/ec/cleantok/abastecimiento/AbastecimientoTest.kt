@@ -90,7 +90,7 @@ class AbastecimientoTest : PruebaIntegracion() {
         val x = Escenario()
         val (solicitudId, _) = x.solicitudConOfertas()
 
-        // La empresa ve las dos ofertas con puntaje; la recomendada es la completa y rápida aunque sea más cara.
+        // La empresa ve las dos ofertas con puntaje; la recomendada es la completa aunque sea más cara (el plazo lo fija la fecha requerida).
         mvc.enviar("GET", "/api/v1/solicitudes/$solicitudId", x.tAdmin).andExpect {
             status { isOk() }
             jsonPath("$.codigo") { value("SC-001") }
@@ -129,7 +129,7 @@ class AbastecimientoTest : PruebaIntegracion() {
 
         // El proveedor no puede saltarse pasos.
         mvc.enviar("POST", "$url/estado", x.tRapido, """{"estado":"EMPACADA"}""").andExpect { status { isConflict() } }
-        listOf("ACEPTADA", "EN_PREPARACION", "EMPACADA").forEach { e ->
+        listOf("EN_PREPARACION", "EMPACADA").forEach { e ->
             mvc.enviar("POST", "$url/estado", x.tRapido, """{"estado":"$e"}""").andExpect {
                 status { isOk() }
                 jsonPath("$.estado") { value(e) }

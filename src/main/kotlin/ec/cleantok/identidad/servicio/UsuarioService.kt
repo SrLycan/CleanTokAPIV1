@@ -7,6 +7,7 @@ import ec.cleantok.comun.seguridad.UsuarioAutenticado
 import org.springframework.beans.factory.ObjectProvider
 import ec.cleantok.comun.seguridad.ContextoSeguridad
 import ec.cleantok.identidad.api.ActualizarUsuarioRequest
+import ec.cleantok.identidad.api.ContactoEmpresaRequest
 import ec.cleantok.identidad.api.CrearEmpresaRequest
 import ec.cleantok.identidad.api.CrearUsuarioRequest
 import ec.cleantok.identidad.api.EmpresaDto
@@ -40,7 +41,29 @@ class UsuarioService(
     @Transactional
     fun crearEmpresa(req: CrearEmpresaRequest): EmpresaDto {
         if (empresas.existsByRuc(req.ruc)) throw ConflictoException("Ya existe una empresa con ese RUC")
-        return EmpresaDto.de(empresas.save(Empresa(req.nombre.trim(), req.ruc)))
+        val e = Empresa(req.nombre.trim(), req.ruc)
+        aplicarContacto(e, ContactoEmpresaRequest(req.telefono, req.email, req.direccion, req.lat, req.lng))
+        return EmpresaDto.de(empresas.save(e))
+    }
+
+    /** Contacto de una empresa (lo edita su admin o el administrador de la plataforma). */
+    @Transactional
+    fun actualizarContacto(empresaId: UUID, req: ContactoEmpresaRequest): EmpresaDto {
+        val e = empresas.findById(empresaId).orElseThrow { NoEncontradoException("Empresa") }
+        aplicarContacto(e, req)
+        return EmpresaDto.de(e)
+    }
+
+    @Transactional(readOnly = true)
+    fun miEmpresa(): EmpresaDto = EmpresaDto.de(empresas.findById(ContextoSeguridad.empresaId()).orElseThrow { NoEncontradoException("Empresa") })
+
+    private fun aplicarContacto(e: Empresa, req: ContactoEmpresaRequest) {
+        if ((req.lat == null) != (req.lng == null)) throw ValidacionException("Indica latitud y longitud, o ninguna")
+        e.telefono = req.telefono?.trim()?.ifBlank { null }
+        e.email = req.email?.trim()?.lowercase()?.ifBlank { null }
+        e.direccion = req.direccion?.trim()?.ifBlank { null }
+        e.lat = req.lat
+        e.lng = req.lng
     }
 
     @Transactional(readOnly = true)
@@ -54,11 +77,13 @@ class UsuarioService(
 
     // ---- ADMIN_EMPRESA: usuarios de su empresa ----
 
-    /** Encargado (por defecto) u otro admin de mi empresa. */
+    /** Encargado (por defecto), supervisor de establecimiento u otro admin de mi empresa. */
     @Transactional
     fun crearEncargado(req: CrearUsuarioRequest): UsuarioDto {
         val rol = req.rol ?: Rol.ENCARGADO
-        if (rol !in setOf(Rol.ENCARGADO, Rol.ADMIN_EMPRESA)) throw ValidacionException("El rol debe ser ENCARGADO o ADMIN_EMPRESA")
+        if (rol !in setOf(Rol.ENCARGADO, Rol.SUPERVISOR, Rol.ADMIN_EMPRESA)) {
+            throw ValidacionException("El rol debe ser ENCARGADO, SUPERVISOR o ADMIN_EMPRESA")
+        }
         return crear(ContextoSeguridad.empresaId(), req, rol)
     }
 
@@ -97,9 +122,14 @@ class UsuarioService(
         return dto(usuario, clave)
     }
 
+    /** El usuario con sus establecimientos (encargados y supervisores). */
+    fun dtoDe(u: Usuario): UsuarioDto = dto(u)
+
     private fun dto(u: Usuario, clave: String? = null) = UsuarioDto.de(
         u, clave,
-        if (u.rol == Rol.ENCARGADO) establecimientos.getIfAvailable()?.de(UsuarioAutenticado(u.id, u.empresaId, u.rol)).orEmpty() else emptyList(),
+        if (u.rol == Rol.ENCARGADO || u.rol == Rol.SUPERVISOR) {
+            establecimientos.getIfAvailable()?.de(UsuarioAutenticado(u.id, u.empresaId, u.rol)).orEmpty()
+        } else emptyList(),
     )
 
     /** Busca solo dentro de la empresa del usuario autenticado: si es de otra, 404. */

@@ -185,7 +185,6 @@ class SemillaAbastecimiento(
         hitos(
             oc1, listOf(
                 Hito(EstadoOrden.APROBADA, adminB, dia(13, 16), "2 destino(s) · total USD ${oc1.total.toPlainString()}"),
-                Hito(EstadoOrden.ACEPTADA, ventasQuimicos, dia(13, 17, 10)),
                 Hito(EstadoOrden.EN_PREPARACION, ventasQuimicos, dia(12, 8, 20)),
                 Hito(EstadoOrden.EMPACADA, ventasQuimicos, dia(12, 11, 45)),
             ),
@@ -227,7 +226,6 @@ class SemillaAbastecimiento(
         hitos(
             oc2, listOf(
                 Hito(EstadoOrden.APROBADA, adminB, dia(2, 15, 30), "4 destino(s) · total USD ${oc2.total.toPlainString()}"),
-                Hito(EstadoOrden.ACEPTADA, ventasHigiene, dia(2, 16, 5)),
                 Hito(EstadoOrden.EN_PREPARACION, ventasHigiene, dia(1, 8, 30)),
                 Hito(EstadoOrden.EMPACADA, ventasHigiene, dia(1, 14, 10)),
             ),
@@ -283,7 +281,6 @@ class SemillaAbastecimiento(
         hitos(
             oa1, listOf(
                 Hito(EstadoOrden.APROBADA, adminA, dia(2, 12), "1 destino(s) · total USD ${oa1.total.toPlainString()}"),
-                Hito(EstadoOrden.ACEPTADA, ventasPapelera, dia(2, 13)),
                 Hito(EstadoOrden.EN_PREPARACION, ventasPapelera, dia(1, 9)),
                 Hito(EstadoOrden.EMPACADA, ventasPapelera, dia(1, 11, 30)),
                 Hito(EstadoOrden.LISTA_PARA_RETIRO, ventasPapelera, dia(1, 11, 35), "Retirar en Av. España 14-20, de 8:00 a 17:00"),

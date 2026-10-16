@@ -51,8 +51,9 @@ import kotlin.random.Random
  * oficinas) y reportes de nivel ocasionales. Los movimientos se insertan en lote con sus saldos (coherentes
  * con las mismas reglas del servicio) y al final se evalúan las alertas. Tres casos quedan preparados:
  * SIN_STOCK (hospital), COBERTURA_BAJA (Torre Azul) y NIVEL_CRITICO (planta textil).
- * Después agrega, si faltan, los establecimientos de [EXTRA_BRILLO] (así una base ya sembrada también los recibe)
- * y la semilla de abastecimiento (proveedores, solicitudes y órdenes).
+ * Después agrega, si faltan, los establecimientos de [EXTRA_BRILLO] (así una base ya sembrada también los recibe),
+ * el contacto de cada empresa y un supervisor de establecimiento por empresa ([SUPERVISORES]), y la semilla de
+ * abastecimiento (proveedores, solicitudes y órdenes).
  */
 @Component
 @Profile("demo")
@@ -107,6 +108,7 @@ class SemillaDemo(
         val nueva = !empresas.existsByRuc(RUC_BRILLO)
         if (nueva) tx.executeWithoutResult { cargar() }
         val agregados = tx.execute { complementar() }!!
+        tx.executeWithoutResult { complementarCuentas() }
         if (nueva || agregados > 0) {
             val abiertas = job.ejecutar()
             log.info("Semilla demo cargada: {} establecimientos nuevos, {} alertas abiertas", agregados, abiertas)
@@ -127,6 +129,29 @@ class SemillaDemo(
             sembrar(brillo, d, admin, emails.map { usuarios.buscarPorEmail(it)!! }, Random(2026 + 10 + i))
         }
         return faltan.size
+    }
+
+    /** Contacto de las empresas demo (lo ve el proveedor) y un supervisor de establecimiento por empresa. */
+    private fun complementarCuentas() {
+        CONTACTOS.forEach { c ->
+            val e = empresas.findByRuc(c.ruc) ?: return@forEach
+            if (e.direccion != null) return@forEach
+            e.telefono = c.telefono
+            e.email = c.email
+            e.direccion = c.direccion
+            e.lat = BigDecimal(c.lat)
+            e.lng = BigDecimal(c.lng)
+        }
+        val clave by lazy { passwordEncoder.encode(CLAVE)!! }
+        SUPERVISORES.forEach { s ->
+            if (usuarios.existeEmail(s.email)) return@forEach
+            val e = empresas.findByRuc(s.ruc) ?: return@forEach
+            val sede = jdbc.queryForList(
+                "select id from establecimiento where empresa_id = ? and nombre = ? and eliminado_en is null", UUID::class.java, e.id, s.sede,
+            ).firstOrNull() ?: return@forEach
+            val u = usuarios.save(Usuario(e.id, s.nombre, s.email, clave, Rol.SUPERVISOR))
+            asignaciones.save(UsuarioEstablecimiento(e.id, u.id, sede))
+        }
     }
 
     private fun cargar() {
@@ -358,6 +383,21 @@ class SemillaDemo(
         const val CLAVE = "Demo2026!"
         const val RUC_BRILLO = "0992000000001"
         const val RUC_ANDINA = "0992000000002"
+
+        data class ContactoDemo(val ruc: String, val telefono: String, val email: String, val direccion: String, val lat: String, val lng: String)
+
+        val CONTACTOS = listOf(
+            ContactoDemo(RUC_BRILLO, "02 245 6789", "compras@brillototal.ec", "Av. 6 de Diciembre N33-42 y Bosmediano, Quito", "-0.180120", "-78.477210"),
+            ContactoDemo(RUC_ANDINA, "07 284 1122", "compras@andina.ec", "Av. Remigio Crespo 3-45, Cuenca", "-2.905700", "-79.012300"),
+        )
+
+        data class SupervisorDemo(val ruc: String, val nombre: String, val email: String, val sede: String)
+
+        /** Supervisores de establecimiento: cada uno ve y controla solo su sede. */
+        val SUPERVISORES = listOf(
+            SupervisorDemo(RUC_BRILLO, "Diana Cevallos (supervisora)", "supervisor@brillototal.ec", "Hospital Básico San Andrés"),
+            SupervisorDemo(RUC_ANDINA, "Marco Vélez (supervisor)", "supervisor@andina.ec", "Planta Textil La Esperanza"),
+        )
         private const val DIAS = 60
 
         val EXTRA_BRILLO = listOf(

@@ -4,10 +4,13 @@ import ec.cleantok.identidad.dominio.Empresa
 import ec.cleantok.identidad.dominio.Rol
 import ec.cleantok.identidad.dominio.Usuario
 import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.constraints.DecimalMax
+import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
+import java.math.BigDecimal
 import java.util.UUID
 
 data class LoginRequest(
@@ -63,11 +66,34 @@ data class CrearEmpresaRequest(
     @field:Pattern(regexp = "\\d{13}", message = "El RUC debe tener 13 dígitos")
     @field:Schema(example = "1791234567001")
     val ruc: String,
+    @field:Size(max = 30) val telefono: String? = null,
+    @field:Size(max = 254) @field:Email(message = "El correo no es válido") val email: String? = null,
+    @field:Size(max = 500) val direccion: String? = null,
+    @field:DecimalMin("-90") @field:DecimalMax("90") val lat: BigDecimal? = null,
+    @field:DecimalMin("-180") @field:DecimalMax("180") val lng: BigDecimal? = null,
 )
 
-data class EmpresaDto(val id: UUID, val nombre: String, val ruc: String) {
+@Schema(description = "Contacto de la empresa que ve el proveedor. Se reemplazan todos los campos (vacío borra).")
+data class ContactoEmpresaRequest(
+    @field:Size(max = 30) val telefono: String? = null,
+    @field:Size(max = 254) @field:Email(message = "El correo no es válido") val email: String? = null,
+    @field:Size(max = 500) val direccion: String? = null,
+    @field:DecimalMin("-90") @field:DecimalMax("90") val lat: BigDecimal? = null,
+    @field:DecimalMin("-180") @field:DecimalMax("180") val lng: BigDecimal? = null,
+)
+
+data class EmpresaDto(
+    val id: UUID,
+    @field:Schema(description = "Razón social") val nombre: String,
+    val ruc: String,
+    val telefono: String? = null,
+    val email: String? = null,
+    val direccion: String? = null,
+    val lat: BigDecimal? = null,
+    val lng: BigDecimal? = null,
+) {
     companion object {
-        fun de(e: Empresa) = EmpresaDto(e.id, e.nombre, e.ruc)
+        fun de(e: Empresa) = EmpresaDto(e.id, e.nombre, e.ruc, e.telefono, e.email, e.direccion, e.lat, e.lng)
     }
 }
 
@@ -77,7 +103,7 @@ data class CrearUsuarioRequest(
     @field:Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres")
     @field:Schema(description = "Si se omite, se genera una clave temporal que el usuario cambia al entrar (recomendado)")
     val password: String? = null,
-    @field:Schema(description = "Solo POST /usuarios: ENCARGADO (por defecto) o ADMIN_EMPRESA")
+    @field:Schema(description = "Solo POST /usuarios: ENCARGADO (por defecto), SUPERVISOR (supervisor de establecimiento) o ADMIN_EMPRESA")
     val rol: Rol? = null,
 )
 
@@ -97,7 +123,7 @@ data class UsuarioDto(
     val debeCambiarClave: Boolean = false,
     @field:Schema(description = "Solo al crear o restablecer: la clave temporal para entregar al usuario. No se vuelve a mostrar.")
     val claveTemporal: String? = null,
-    @field:Schema(description = "Establecimientos donde opera (encargados)") val establecimientos: List<EstablecimientoAsignadoDto> = emptyList(),
+    @field:Schema(description = "Establecimientos donde opera (encargados y supervisores)") val establecimientos: List<EstablecimientoAsignadoDto> = emptyList(),
 ) {
     companion object {
         fun de(u: Usuario, claveTemporal: String? = null, establecimientos: List<EstablecimientoAsignadoDto> = emptyList()) =

@@ -29,8 +29,8 @@ import java.util.UUID
 class EstablecimientoController(private val servicio: EstablecimientoService) {
 
     @GetMapping("/mios")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
-    @Operation(summary = "Establecimientos activos donde opero (asignados al encargado; todos los de la empresa para el admin)")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
+    @Operation(summary = "Establecimientos activos donde opero (asignados al encargado o al supervisor; todos los de la empresa para el admin)")
     fun mios(): List<EstablecimientoDto> = servicio.mios()
 
     @GetMapping
@@ -42,11 +42,14 @@ class EstablecimientoController(private val servicio: EstablecimientoService) {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN_EMPRESA')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Crea un establecimiento; su bodega se crea automáticamente")
+    @Operation(
+        summary = "Crea un establecimiento; su bodega se crea automáticamente",
+        description = "Opcional: `supervisorId` (un SUPERVISOR existente) o `nuevoSupervisor` (cuenta nueva con clave temporal).",
+    )
     fun crear(@Valid @RequestBody req: EstablecimientoRequest): EstablecimientoDto = servicio.crear(req)
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
     @Operation(summary = "Obtiene un establecimiento")
     fun obtener(@PathVariable id: UUID): EstablecimientoDto = servicio.obtener(id)
 
@@ -75,9 +78,17 @@ class EstablecimientoController(private val servicio: EstablecimientoService) {
     )
     fun eliminar(@PathVariable id: UUID) = servicio.eliminar(id)
 
+    @PutMapping("/{id}/supervisor")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN_EMPRESA')")
+    @Operation(
+        summary = "Asigna el supervisor de establecimiento (uno existente o una cuenta nueva); vacío lo quita",
+        description = "Cada sede tiene un solo supervisor, que solo ve y controla las sedes que tiene asignadas.",
+    )
+    fun supervisor(@PathVariable id: UUID, @Valid @RequestBody req: SupervisorRequest): EstablecimientoDto = servicio.cambiarSupervisor(id, req)
+
     @PutMapping("/asignaciones/{usuarioId}")
     @PreAuthorize("hasRole('ADMIN_EMPRESA')")
-    @Operation(summary = "Define en qué establecimientos opera un encargado (reemplaza la lista)")
+    @Operation(summary = "Define en qué establecimientos opera un encargado o un supervisor (reemplaza la lista)")
     fun asignarAUsuario(@PathVariable usuarioId: UUID, @RequestBody ids: List<UUID>): List<EstablecimientoAsignadoDto> =
         servicio.asignarEstablecimientos(usuarioId, ids)
 

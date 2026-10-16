@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController
 class QrController(private val qr: QrService) {
 
     @GetMapping("/api/v1/qr/{token}")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
     @Operation(
         summary = "Resuelve un QR escaneado",
         description = "Android intercepta `{CLEANTOK_URL_PUBLICA}/q/{token}` y llama aquí. " +
