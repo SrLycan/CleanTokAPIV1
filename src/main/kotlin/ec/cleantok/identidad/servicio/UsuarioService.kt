@@ -77,12 +77,12 @@ class UsuarioService(
 
     // ---- ADMIN_EMPRESA: usuarios de su empresa ----
 
-    /** Encargado (por defecto), supervisor de establecimiento u otro admin de mi empresa. */
+    /** Encargado (por defecto), supervisor de establecimiento, administrador de contrato u otro admin de mi empresa. */
     @Transactional
     fun crearEncargado(req: CrearUsuarioRequest): UsuarioDto {
         val rol = req.rol ?: Rol.ENCARGADO
-        if (rol !in setOf(Rol.ENCARGADO, Rol.SUPERVISOR, Rol.ADMIN_EMPRESA)) {
-            throw ValidacionException("El rol debe ser ENCARGADO, SUPERVISOR o ADMIN_EMPRESA")
+        if (rol !in setOf(Rol.ENCARGADO, Rol.SUPERVISOR, Rol.ADMIN_CONTRATO, Rol.ADMIN_EMPRESA)) {
+            throw ValidacionException("El rol debe ser ENCARGADO, SUPERVISOR, ADMIN_CONTRATO o ADMIN_EMPRESA")
         }
         return crear(ContextoSeguridad.empresaId(), req, rol)
     }
@@ -127,7 +127,7 @@ class UsuarioService(
 
     private fun dto(u: Usuario, clave: String? = null) = UsuarioDto.de(
         u, clave,
-        if (u.rol == Rol.ENCARGADO || u.rol == Rol.SUPERVISOR) {
+        if (u.rol in setOf(Rol.ENCARGADO, Rol.SUPERVISOR, Rol.ADMIN_CONTRATO)) {
             establecimientos.getIfAvailable()?.de(UsuarioAutenticado(u.id, u.empresaId, u.rol)).orEmpty()
         } else emptyList(),
     )

@@ -103,7 +103,7 @@ data class CrearUsuarioRequest(
     @field:Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres")
     @field:Schema(description = "Si se omite, se genera una clave temporal que el usuario cambia al entrar (recomendado)")
     val password: String? = null,
-    @field:Schema(description = "Solo POST /usuarios: ENCARGADO (por defecto), SUPERVISOR (supervisor de establecimiento) o ADMIN_EMPRESA")
+    @field:Schema(description = "Solo POST /usuarios: ENCARGADO (por defecto), SUPERVISOR (supervisor de establecimiento), ADMIN_CONTRATO (administrador de contrato) o ADMIN_EMPRESA")
     val rol: Rol? = null,
 )
 

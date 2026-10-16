@@ -31,7 +31,7 @@ class UbicacionController(
     private val qr: QrService,
 ) {
     @GetMapping("/establecimientos/{id}/ubicaciones")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ADMIN_CONTRATO', 'ENCARGADO')")
     @Operation(summary = "Bodega, pisos y áreas del establecimiento en orden")
     fun listar(@PathVariable id: UUID): List<UbicacionDto> = servicio.listar(id)
 

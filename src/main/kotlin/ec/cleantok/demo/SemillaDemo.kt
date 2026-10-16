@@ -52,7 +52,8 @@ import kotlin.random.Random
  * con las mismas reglas del servicio) y al final se evalúan las alertas. Tres casos quedan preparados:
  * SIN_STOCK (hospital), COBERTURA_BAJA (Torre Azul) y NIVEL_CRITICO (planta textil).
  * Después agrega, si faltan, los establecimientos de [EXTRA_BRILLO] (así una base ya sembrada también los recibe),
- * el contacto de cada empresa y un supervisor de establecimiento por empresa ([SUPERVISORES]), y la semilla de
+ * el contacto de cada empresa, un supervisor de establecimiento y un administrador de contrato por empresa
+ * ([SUPERVISORES], [ADMINS_CONTRATO]), un super admin de demo ([SUPER_ADMIN_DEMO]) y la semilla de
  * abastecimiento (proveedores, solicitudes y órdenes).
  */
 @Component
@@ -143,14 +144,19 @@ class SemillaDemo(
             e.lng = BigDecimal(c.lng)
         }
         val clave by lazy { passwordEncoder.encode(CLAVE)!! }
-        SUPERVISORES.forEach { s ->
+        (SUPERVISORES + ADMINS_CONTRATO).forEach { s ->
             if (usuarios.existeEmail(s.email)) return@forEach
             val e = empresas.findByRuc(s.ruc) ?: return@forEach
-            val sede = jdbc.queryForList(
-                "select id from establecimiento where empresa_id = ? and nombre = ? and eliminado_en is null", UUID::class.java, e.id, s.sede,
-            ).firstOrNull() ?: return@forEach
-            val u = usuarios.save(Usuario(e.id, s.nombre, s.email, clave, Rol.SUPERVISOR))
-            asignaciones.save(UsuarioEstablecimiento(e.id, u.id, sede))
+            val u = usuarios.save(Usuario(e.id, s.nombre, s.email, clave, s.rol))
+            s.sedes.forEach { nombre ->
+                jdbc.queryForList(
+                    "select id from establecimiento where empresa_id = ? and nombre = ? and eliminado_en is null", UUID::class.java, e.id, nombre,
+                ).firstOrNull()?.let { asignaciones.save(UsuarioEstablecimiento(e.id, u.id, it)) }
+            }
+        }
+        // Super admin de la demo con clave conocida (el de la instalación usa la clave que generó el instalador).
+        if (!usuarios.existeEmail(SUPER_ADMIN_DEMO)) {
+            usuarios.save(Usuario(null, "Administración del sistema (demo)", SUPER_ADMIN_DEMO, passwordEncoder.encode(CLAVE_SUPER_ADMIN_DEMO)!!, Rol.SUPER_ADMIN))
         }
     }
 
@@ -391,13 +397,29 @@ class SemillaDemo(
             ContactoDemo(RUC_ANDINA, "07 284 1122", "compras@andina.ec", "Av. Remigio Crespo 3-45, Cuenca", "-2.905700", "-79.012300"),
         )
 
-        data class SupervisorDemo(val ruc: String, val nombre: String, val email: String, val sede: String)
+        data class CuentaSedeDemo(val ruc: String, val rol: Rol, val nombre: String, val email: String, val sedes: List<String>)
 
         /** Supervisores de establecimiento: cada uno ve y controla solo su sede. */
         val SUPERVISORES = listOf(
-            SupervisorDemo(RUC_BRILLO, "Diana Cevallos (supervisora)", "supervisor@brillototal.ec", "Hospital Básico San Andrés"),
-            SupervisorDemo(RUC_ANDINA, "Marco Vélez (supervisor)", "supervisor@andina.ec", "Planta Textil La Esperanza"),
+            CuentaSedeDemo(RUC_BRILLO, Rol.SUPERVISOR, "Diana Cevallos (supervisora)", "supervisor@brillototal.ec", listOf("Hospital Básico San Andrés")),
+            CuentaSedeDemo(RUC_ANDINA, Rol.SUPERVISOR, "Marco Vélez (supervisor)", "supervisor@andina.ec", listOf("Planta Textil La Esperanza")),
         )
+
+        /** Administradores de contrato: monitorean el consumo por piso de sus sedes (solo lectura). */
+        val ADMINS_CONTRATO = listOf(
+            CuentaSedeDemo(
+                RUC_BRILLO, Rol.ADMIN_CONTRATO, "Gabriela Ortiz (administradora de contrato)", "contrato@brillototal.ec",
+                listOf("Hospital Básico San Andrés", "Edificio Torre Azul – Oficinas"),
+            ),
+            CuentaSedeDemo(
+                RUC_ANDINA, Rol.ADMIN_CONTRATO, "Raúl Mena (administrador de contrato)", "contrato@andina.ec",
+                listOf("Oficinas Municipales Centro", "Planta Textil La Esperanza"),
+            ),
+        )
+
+        /** Super admin con clave conocida para la demo (perfil `demo`). */
+        const val SUPER_ADMIN_DEMO = "superadmin.demo@cleantok.ec"
+        const val CLAVE_SUPER_ADMIN_DEMO = "SuperAdmin2026!"
         private const val DIAS = 60
 
         val EXTRA_BRILLO = listOf(

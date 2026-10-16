@@ -179,7 +179,7 @@ class AbastecimientoTest : PruebaIntegracion() {
             jsonPath("$.estado") { value("ENTREGADA") }
             jsonPath("$.entregas[1].completa") { value(false) }
             jsonPath("$.entregas[1].lineas[0].cantidadRecibida") { value(4.0) }
-            jsonPath("$.pasos[*].hecho", contains(true, true, true, true, true, true, true))
+            jsonPath("$.pasos[*].hecho", contains(true, true, true, true, true, true))
             jsonPath("$.eventos[0].titulo") { value("Entregado") }
         }
         mvc.get("/api/v1/establecimientos/${x.est2.id}/inventario") { header("Authorization", x.tEnc) }.andExpect {

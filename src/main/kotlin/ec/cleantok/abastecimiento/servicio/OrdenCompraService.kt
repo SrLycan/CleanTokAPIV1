@@ -92,7 +92,7 @@ class OrdenCompraService(
             Rol.SUPERVISOR, Rol.ENCARGADO -> ordenes.conEntregasPara(u.id)
             Rol.PROVEEDOR -> ordenes.findAllByProveedorIdOrderByCreatedAtDesc(u.proveedorId!!)
             Rol.REPARTIDOR -> ordenes.findAllByRepartidorIdOrderByCreatedAtDesc(u.id)
-            Rol.SUPER_ADMIN -> emptyList()
+            Rol.SUPER_ADMIN, Rol.ADMIN_CONTRATO -> emptyList()
         }
         return lista.map(::resumen)
     }
@@ -211,7 +211,7 @@ class OrdenCompraService(
                 entregas.findAllByOrdenIdOrderByParada(o.id).any { asignaciones.existsByUsuarioIdAndEstablecimientoId(u.id, it.establecimientoId) }
             Rol.PROVEEDOR -> o.proveedorId == u.proveedorId
             Rol.REPARTIDOR -> o.repartidorId == u.id
-            Rol.SUPER_ADMIN -> false
+            Rol.SUPER_ADMIN, Rol.ADMIN_CONTRATO -> false
         }
         if (!ve) throw NoEncontradoException("Orden de compra")
         return o!!

@@ -10,8 +10,12 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
-/** SUPERVISOR: "Supervisor de establecimiento", controla solo las sedes que tiene asignadas. */
-enum class Rol { SUPER_ADMIN, ADMIN_EMPRESA, SUPERVISOR, ENCARGADO, PROVEEDOR, REPARTIDOR }
+/**
+ * SUPERVISOR: "Supervisor de establecimiento", controla solo las sedes que tiene asignadas.
+ * ADMIN_CONTRATO: "Administrador de contrato", monitorea (solo lectura) el consumo por piso de sus sedes:
+ * consumos atípicos y que cada piso tenga insumos suficientes.
+ */
+enum class Rol { SUPER_ADMIN, ADMIN_EMPRESA, SUPERVISOR, ADMIN_CONTRATO, ENCARGADO, PROVEEDOR, REPARTIDOR }
 
 @Entity
 @Table(name = "empresa")

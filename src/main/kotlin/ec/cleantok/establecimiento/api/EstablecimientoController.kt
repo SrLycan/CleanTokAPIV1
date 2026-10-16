@@ -29,7 +29,7 @@ import java.util.UUID
 class EstablecimientoController(private val servicio: EstablecimientoService) {
 
     @GetMapping("/mios")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ADMIN_CONTRATO', 'ENCARGADO')")
     @Operation(summary = "Establecimientos activos donde opero (asignados al encargado o al supervisor; todos los de la empresa para el admin)")
     fun mios(): List<EstablecimientoDto> = servicio.mios()
 
@@ -49,7 +49,7 @@ class EstablecimientoController(private val servicio: EstablecimientoService) {
     fun crear(@Valid @RequestBody req: EstablecimientoRequest): EstablecimientoDto = servicio.crear(req)
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ADMIN_CONTRATO', 'ENCARGADO')")
     @Operation(summary = "Obtiene un establecimiento")
     fun obtener(@PathVariable id: UUID): EstablecimientoDto = servicio.obtener(id)
 

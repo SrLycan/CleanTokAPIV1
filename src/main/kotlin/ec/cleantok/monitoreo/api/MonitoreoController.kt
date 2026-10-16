@@ -45,6 +45,7 @@ class MonitoreoController(
     }
 
     @GetMapping("/establecimientos/{id}/alertas")
+    @PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ADMIN_CONTRATO', 'ENCARGADO')")
     @Operation(summary = "Alertas del establecimiento (más recientes primero)")
     fun listar(
         @PathVariable id: UUID,

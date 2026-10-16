@@ -21,7 +21,7 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1")
-@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ENCARGADO')")
+@PreAuthorize("hasAnyRole('ADMIN_EMPRESA', 'SUPERVISOR', 'ADMIN_CONTRATO', 'ENCARGADO')")
 @Tag(name = "Inventario y kardex")
 class InventarioController(
     private val inventario: InventarioService,

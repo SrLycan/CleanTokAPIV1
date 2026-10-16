@@ -16,6 +16,7 @@ data class UsuarioAutenticado(
 ) {
     val esAdmin: Boolean get() = rol == Rol.ADMIN_EMPRESA
     val esSupervisor: Boolean get() = rol == Rol.SUPERVISOR
+    val esAdminContrato: Boolean get() = rol == Rol.ADMIN_CONTRATO
     val esEncargado: Boolean get() = rol == Rol.ENCARGADO
 
     /** Administra la operación de una sede: el admin en todas las de su empresa, el supervisor en las suyas. */

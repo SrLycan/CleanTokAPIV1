@@ -212,13 +212,13 @@ class EstablecimientoService(
     }
 
     /**
-     * Reemplaza los establecimientos de un encargado o de un supervisor (vista "Equipo" del admin).
+     * Reemplaza los establecimientos de un encargado, un supervisor o un administrador de contrato (vista "Equipo" del admin).
      * Cada sede tiene un solo supervisor: al asignarle una, deja de ser del supervisor anterior.
      */
     @Transactional
     fun asignarEstablecimientos(usuarioId: UUID, ids: List<UUID>): List<EstablecimientoAsignadoDto> {
         val empresaId = ContextoSeguridad.empresaId()
-        val u = usuarios.findByIdAndEmpresaId(usuarioId, empresaId)?.takeIf { it.rol == Rol.ENCARGADO || it.rol == Rol.SUPERVISOR }
+        val u = usuarios.findByIdAndEmpresaId(usuarioId, empresaId)?.takeIf { it.rol in setOf(Rol.ENCARGADO, Rol.SUPERVISOR, Rol.ADMIN_CONTRATO) }
             ?: throw NoEncontradoException("Encargado")
         val pedidos = ids.toSet().map { acceso.deMiEmpresa(it) }
         val actuales = asignaciones.findAllByUsuarioId(u.id)
@@ -245,7 +245,7 @@ class EstablecimientoService(
 
     private fun deUsuario(usuario: UsuarioAutenticado): List<Establecimiento> = when (usuario.rol) {
         Rol.ADMIN_EMPRESA -> establecimientos.findAllByEmpresaIdAndActivoTrueOrderByNombre(usuario.empresaId!!)
-        Rol.SUPERVISOR, Rol.ENCARGADO -> establecimientos.asignadosActivos(usuario.id)
+        Rol.SUPERVISOR, Rol.ADMIN_CONTRATO, Rol.ENCARGADO -> establecimientos.asignadosActivos(usuario.id)
         Rol.SUPER_ADMIN, Rol.PROVEEDOR, Rol.REPARTIDOR -> emptyList()
     }
 
