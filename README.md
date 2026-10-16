@@ -46,6 +46,9 @@ Contraseña de todos: **`Demo2026!`**
 | `pedro@andina.ec` | ENCARGADO | Limpieza Andina | Planta Textil |
 | `supervisor@brillototal.ec` | SUPERVISOR (supervisor de establecimiento) | Brillo Total | solo Hospital |
 | `supervisor@andina.ec` | SUPERVISOR (supervisor de establecimiento) | Limpieza Andina | solo Planta Textil |
+| `contrato@brillototal.ec` | ADMIN_CONTRATO (administrador de contrato, solo lectura) | Brillo Total | Hospital, Torre Azul |
+| `contrato@andina.ec` | ADMIN_CONTRATO (administrador de contrato, solo lectura) | Limpieza Andina | Oficinas Municipales, Planta Textil |
+| `superadmin.demo@cleantok.ec` / `SuperAdmin2026!` | SUPER_ADMIN (demo, perfil `demo`) | — | super admin con clave conocida; en AWS `superadmin@cleantok.ec` usa la clave del instalador |
 | `superadmin@cleantok.ec` / `SuperAdmin2026!` | SUPER_ADMIN | — | crea empresas y admins |
 
 Brillo Total tiene además **Clínica Los Valles**, **Edificio Plaza Norte** y **Colegio Bilingüe Los Andes** (Quito), para que
